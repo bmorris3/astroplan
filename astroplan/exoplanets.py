@@ -10,7 +10,8 @@ from astropy.constants import M_jup, M_sun, R_jup, R_sun
 import numpy as np
 from .core import FixedTarget
 
-__all__ = ["get_FixedTarget_from_exoplanet", "transit_visible"]
+__all__ = ["get_FixedTarget_from_exoplanet", "is_transit_visible",
+           "get_visible_transits", "get_transits"]
 
 exoplanet_database_url = "http://www.exoplanets.org/csv-files/exoplanets.csv"
 # TODO: Include a copy of the database in package? File size=~8MB
@@ -248,11 +249,23 @@ def get_transits(planet, time_start, time_end, tbl=exoplanet_table):
     else:
         return []
 
-@u.quantity_input(horizon=u.deg)
-def transit_visible(observer, mid_transit_time, planet, horizon=0*u.degree,
-                    full_transit=True, tbl=exoplanet_table):
+from astropy.coordinates import get_sun
+def is_night(observer, time, horizon=0*u.degree):
+    # TODO: remove this method when its equivalent is merged.
+    if not isinstance(time, Time):
+        time = Time(time)
+    solar_altitude = observer.altaz(time, target=get_sun(time)).alt
+    sun_below_horizon = solar_altitude < horizon
+    return sun_below_horizon
+
+@u.quantity_input(horizon=u.deg, solar_horizon=u.deg)
+def is_transit_visible(observer, planet, mid_transit_time,
+                       planet_horizon=0*u.degree, solar_horizon=-6*u.deg,
+                       full_transit=True, tbl=exoplanet_table):
     """
-    Is transit of ``planet`` at ``time`` visible for this ``observer``?
+    Is transit of ``planet`` at ``time`` visible at night for this ``observer``?
+
+    "At night" is defined as times when the Sun is below ``solar_horizon``.
 
     Parameters
     ----------
@@ -264,6 +277,12 @@ def transit_visible(observer, mid_transit_time, planet, horizon=0*u.degree,
 
     planet : str
         Name of exoplanet
+
+    planet_horizon : `~astropy.units.Quantity` (optional)
+        Minimum altitude of the planet required to be "visible"
+
+    solar_horizon : `~astropy.units.Quantity` (optional)
+        Maximum altitude of the Sun defining which transits occur "at night"
 
     full_transit : bool
         Require visible from first to fourth contact (True) or only
@@ -277,6 +296,15 @@ def transit_visible(observer, mid_transit_time, planet, horizon=0*u.degree,
         check_times = [mid_transit_time]
 
     target = get_FixedTarget_from_exoplanet(planet)
-    visible = [True if observer.can_see(t, target) and observer.is_night(t)
+    # TODO replace is_night with observer.is_night(t) when it returns
+    visible = [True if observer.can_see(t, target, horizon=planet_horizon) and
+                       is_night(observer, t, horizon=solar_horizon)
                else False for t in check_times]
     return all(visible)
+
+@u.quantity_input(horizon=u.deg, solar_horizon=u.deg)
+def get_visible_transits(observer, planet, start_time, end_time):
+    all_transits = get_transits(planet, start_time, end_time)
+    visible_transits = Time([t for t in all_transits
+                             if is_transit_visible(observer, planet, t)])
+    return visible_transits

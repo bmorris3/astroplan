@@ -5,7 +5,8 @@ import astropy.units as u
 from astropy.time import Time
 from astropy.coordinates import SkyCoord
 from ..exoplanets import (exoplanet_table, get_FixedTarget_from_exoplanet,
-                          get_planet_index, get_transits, transit_visible)
+                          get_planet_index, get_transits, is_transit_visible,
+                          get_visible_transits)
 from ..core import Observer
 from ..sites import get_site
 from astropy.tests.helper import assert_quantity_allclose
@@ -38,19 +39,21 @@ def test_database_parser():
     assert_quantity_allclose(period_tbl, period_exoplanetsorg,
                              atol=0.00001*u.day)
 
-def test_get_transits():
+def test_get_visible_transits():
     # Verify with http://jefflcoughlin.com/transit.html or specifically
     # http://jefflcoughlin.com/cgi-bin/transit.cgi?Observatory=Kitt+Peak&Latitude=&Longitude=&JDstart=2456591.5&JDend=2456595.5&Sort=name&UTOpt=1&wavemu=1.0&albedo=0.0&fdist=0.6
     start = Time(2456591.5, format='jd')
     end = Time(2456595.5, format='jd')
 
-    planet = 'CoRoT-1 b'
-    all_transits_corot1 = get_transits(planet, start, end)
-
     kpno = Observer(location=get_site('kpno'))
-    visible_transits_corot1 = [t for t in all_transits_corot1
-                               if transit_visible(kpno, t, planet)]
-    coughlin_corot1 = Time([2456591.889788, 2456594.907700], format='jd')
 
-    print(abs(visible_transits_corot1 - coughlin_corot1).to(u.min))
+    planet1 = 'CoRoT-1 b'
+    visible_transits_corot1 = get_visible_transits(kpno, planet1, start, end)
+    coughlin_corot1 = Time([2456591.889788, 2456594.907700], format='jd')
     assert all(abs(visible_transits_corot1 - coughlin_corot1) < 10*u.min)
+
+    planet2 = 'WASP-50 b'
+    visible_transits_wasp50 = get_visible_transits(kpno, planet2, start, end)
+    coughlin_wasp50 = Time([2456592.857701, 2456594.812797], format='jd')
+    assert all(abs(visible_transits_wasp50 - coughlin_wasp50) < 10*u.min)
+
