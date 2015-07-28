@@ -244,7 +244,7 @@ def get_transits(planet, time_start, time_end, tbl=exoplanet_table):
     if start == end:
         return start*period + epoch
     elif start < end:
-        return np.arange(start, end+1, dtype=int)*period + epoch
+        return Time(np.arange(start, end+1, dtype=int)*period + epoch)
     else:
         return []
 
