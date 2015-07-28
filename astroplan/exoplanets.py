@@ -8,6 +8,7 @@ from astropy.utils.data import download_file
 from astropy.io import ascii
 from astropy.constants import M_jup, M_sun, R_jup, R_sun
 import numpy as np
+from .core import FixedTarget
 
 exoplanet_database_url = "http://www.exoplanets.org/csv-files/exoplanets.csv"
 # TODO: Include a copy of the database in package? File size=~8MB
@@ -18,168 +19,93 @@ exoplanet_table_units = dict(
     AUPPER=u.AU,
     ALOWER=u.AU,
     UA=u.AU,
-#    AREF=None,
-#    AURL=None,
     AR=u.dimensionless_unscaled,
     ARUPPER=u.dimensionless_unscaled,
     ARLOWER=u.dimensionless_unscaled,
     UAR=u.dimensionless_unscaled,
-#    ARREF=None,
-#    ARURL=None,
-#    ASTROMETRY=None,
     B=u.dimensionless_unscaled,
     BUPPER=u.dimensionless_unscaled,
     BLOWER=u.dimensionless_unscaled,
     UB=u.dimensionless_unscaled,
-#    BREF=None,
-#    BURL=None,
     BIGOM=u.deg,
     BIGOMUPPER=u.deg,
     BIGOMLOWER=u.deg,
     UBIGOM=u.deg,
-#    BIGOMREF=None,
-#    BIGOMURL=None,
-#    BINARY=None,
-#    BINARYREF=None,
-#    BINARYURL=None,
-    # B minus V magnitude
     BMV=u.mag,
     CHI2=u.dimensionless_unscaled,
-#    COMP=None,
-#    DATE=None,
     DEC=u.deg,
-#    DEC_STRING=u.deg,
     DENSITY=u.g/u.cm**3,
     DENSITYUPPER=u.g/u.cm**3,
     DENSITYLOWER=u.g/u.cm**3,
     UDENSITY=u.g/u.cm**3,
-#    DENSITYREF=None,
-#    DENSITYURL=None,
     DEPTH=u.dimensionless_unscaled,
     DEPTHUPPER=u.dimensionless_unscaled,
     DEPTHLOWER=u.dimensionless_unscaled,
     UDEPTH=u.dimensionless_unscaled,
-#    DEPTHREF=None,
-#    DEPTHURL=None,
-    # Distance during transit in stellar radii
     DIST=u.parsec,
     DISTUPPER=u.parsec,
     DISTLOWER=u.parsec,
     UDIST=u.parsec,
-#    DISTREF=None,
-#    DISTURL=None,
     DR=u.dimensionless_unscaled,
     DRUPPER=u.dimensionless_unscaled,
     DRLOWER=u.dimensionless_unscaled,
     UDR=u.dimensionless_unscaled,
-#    DRREF=u.deg,
-#    DRURL=u.deg,
     DVDT=u.m/u.s/u.day,
     DVDTUPPER=u.m/u.s/u.day,
     DVDTLOWER=u.m/u.s/u.day,
     UDVDT=u.m/u.s/u.day,
-#    DVDTREF=u.deg,
-#    DVDTURL=u.deg,
-#    EANAME=u.deg,
-#    EAURL=u.deg,
     ECC=u.dimensionless_unscaled,
     ECCUPPER=u.dimensionless_unscaled,
     ECCLOWER=u.dimensionless_unscaled,
     UECC=u.dimensionless_unscaled,
-#    ECCREF=u.deg,
-#    ECCURL=u.deg,
-#    EOD=u.deg,
-#    ETDNAME=u.deg,
-#    ETDURL=u.deg,
     FE=u.dimensionless_unscaled,
     FEUPPER=u.dimensionless_unscaled,
     FELOWER=u.dimensionless_unscaled,
     UFE=u.dimensionless_unscaled,
-#    FEREF=u.deg,
-#    FEURL=u.deg,
-#    FIRSTREF=u.deg,
-#    FIRSTURL=u.deg,
-#    FREEZE_ECC=u.deg,
     GAMMA=u.km/u.s,
     GAMMAUPPER=u.km/u.s,
     GAMMALOWER=u.km/u.s,
     UGAMMA=u.km/u.s,
-#    GAMMAREF=u.deg,
-#    GAMMAURL=u.deg,
-#    GL=u.deg,
     GRAVITY=u.dex(u.cm/u.s**2),
     GRAVITYUPPER=u.dex(u.cm/u.s**2),
     GRAVITYLOWER=u.dex(u.cm/u.s**2),
     UGRAVITY=u.dex(u.cm/u.s**2),
-#    GRAVITYREF=u.deg,
-#    GRAVITYURL=u.deg,
     H=u.mag,
-#    HD=u.deg,
-#    HIPP=u.deg,
-#    HR=u.deg,
     I=u.deg,
     IUPPER=u.deg,
     ILOWER=u.deg,
     UI=u.deg,
-#    IREF=u.deg,
-#    IURL=u.deg,
-#    IMAGING=u.deg,
     J=u.mag,
-#    JSNAME=u.deg,
-#    EPEURL=u.deg,
     K=u.m/u.s,
     KUPPER=u.m/u.s,
     KLOWER=u.m/u.s,
     UK=u.m/u.s,
-#    KREF=u.deg,
-#    KURL=u.deg,
-#    KOI=u.deg,
     KS=u.mag,
     KP=u.mag,
     LAMBDA=u.deg,
     LAMBDAUPPER=u.deg,
     LAMBDALOWER=u.deg,
     ULAMBDA=u.deg,
-#    LAMBDAREF=u.deg,
-#    LAMBDAURL=u.deg,
     LOGG=u.deg,
     LOGGUPPER=u.deg,
     LOGGLOWER=u.deg,
     ULOGG=u.deg,
-#    LOGGREF=u.deg,
-#    LOGGURL=u.deg,
     MASS=M_jup,
     MASSUPPER=M_jup,
     MASSLOWER=M_jup,
     UMASS=M_jup,
-#    MASSREF=u.deg,
-#    MASSURL=u.deg,
-#    MICROLENSING=u.deg,
     MSINI=M_jup,
     MSINIUPPER=M_jup,
     MSINILOWER=M_jup,
     UMSINI=M_jup,
-#    MSINIREF=u.deg,
-#    MSINIURL=u.deg,
     MSTAR=M_sun,
     MSTARUPPER=M_sun,
     MSTARLOWER=M_sun,
     UMSTAR=M_sun,
-#    MSTARREF=u.deg,
-#    MSTARURL=u.deg,
-#    MULT=u.deg,
-#    NAME=u.deg,
-#    NCOMP=u.deg,
-#    NOBS=u.deg,
     OM=u.deg,
     OMUPPER=u.deg,
     OMLOWER=u.deg,
     UOM=u.deg,
-#    OMREF=u.deg,
-#    OMURL=u.deg,
-#    ORBREF=u.deg,
-#    ORBURL=u.deg,
-#    OTHERNAME=u.deg,
     PAR=u.marcsec,
     PARUPPER=u.marcsec,
     PARLOWER=u.marcsec,
@@ -188,148 +114,83 @@ exoplanet_table_units = dict(
     PERUPPER=u.day,
     PERLOWER=u.day,
     UPER=u.day,
-#    PERREF=u.deg,
-#    PERURL=u.deg,
-#    PLANETDISCMETH=u.deg,
     R=R_jup,
     RUPPER=R_jup,
     RLOWER=R_jup,
     UR=R_jup,
-#    RREF=u.deg,
-#    RURL=u.deg,
     RA=u.hourangle,
-#    RA_STRING=u.deg,
     RHK=u.dimensionless_unscaled,
     RHOSTAR=u.g/u.cm**3,
     RHOSTARUPPER=u.g/u.cm**3,
     RHOSTARLOWER=u.g/u.cm**3,
     URHOSTAR=u.g/u.cm**3,
-#    RHOSTARREF=u.deg,
-#    RHOSTARURL=u.deg,
     RMS=u.dimensionless_unscaled,
     RR=u.dimensionless_unscaled,
     RRUPPER=u.dimensionless_unscaled,
     RRLOWER=u.dimensionless_unscaled,
     URR=u.dimensionless_unscaled,
-#    RRREF=u.deg,
-#    RRURL=u.deg,
     RSTAR=R_sun,
     RSTARUPPER=R_sun,
     RSTARLOWER=R_sun,
     URSTAR=R_sun,
-#    RSTARREF=u.deg,
-#    RSTARURL=u.deg,
-  #  SAO=u.deg,
-  #  SE=u.deg,
-#    SEREF=u.deg,
-#    SEURL=u.deg,
     SEDEPTHJ=u.dimensionless_unscaled,
     SEDEPTHJUPPER=u.dimensionless_unscaled,
     SEDEPTHJLOWER=u.dimensionless_unscaled,
     USEDEPTHJ=u.dimensionless_unscaled,
-#    SEDEPTHJREF=u.dimensionless_unscaled,
-#    SEDEPTHJURL=u.dimensionless_unscaled,
     SEDEPTHH=u.dimensionless_unscaled,
     SEDEPTHHUPPER=u.dimensionless_unscaled,
     SEDEPTHHLOWER=u.dimensionless_unscaled,
     USEDEPTHH=u.dimensionless_unscaled,
-#    SEDEPTHHREF=u.dimensionless_unscaled,
-#    SEDEPTHHURL=u.dimensionless_unscaled,
     SEDEPTHKS=u.dimensionless_unscaled,
     SEDEPTHKSUPPER=u.dimensionless_unscaled,
     SEDEPTHKSLOWER=u.dimensionless_unscaled,
     USEDEPTHKS=u.dimensionless_unscaled,
-#    SEDEPTHKSREF=u.dimensionless_unscaled,
-#    SEDEPTHKSURL=u.dimensionless_unscaled,
     SEDEPTHKP=u.dimensionless_unscaled,
     SEDEPTHKPUPPER=u.dimensionless_unscaled,
     SEDEPTHKPLOWER=u.dimensionless_unscaled,
     USEDEPTHKP=u.dimensionless_unscaled,
-#    SEDEPTHKPREF=u.dimensionless_unscaled,
-#    SEDEPTHKPURL=u.dimensionless_unscaled,
     SEDEPTH36=u.dimensionless_unscaled,
     SEDEPTH36UPPER=u.dimensionless_unscaled,
     SEDEPTH36LOWER=u.dimensionless_unscaled,
     USEDEPTH36=u.dimensionless_unscaled,
-#    SEDEPTH36REF=u.dimensionless_unscaled,
-#    SEDEPTH36URL=u.dimensionless_unscaled,
     SEDEPTH45=u.dimensionless_unscaled,
     SEDEPTH45UPPER=u.dimensionless_unscaled,
     SEDEPTH45LOWER=u.dimensionless_unscaled,
     USEDEPTH45=u.dimensionless_unscaled,
-#    SEDEPTH45REF=u.dimensionless_unscaled,
-#    SEDEPTH45URL=u.dimensionless_unscaled,
     SEDEPTH58=u.dimensionless_unscaled,
     SEDEPTH58UPPER=u.dimensionless_unscaled,
     SEDEPTH58LOWER=u.dimensionless_unscaled,
     USEDEPTH58=u.dimensionless_unscaled,
-#    SEDEPTH58REF=u.dimensionless_unscaled,
-#    SEDEPTH58URL=u.dimensionless_unscaled,
     SEDEPTH80=u.dimensionless_unscaled,
     SEDEPTH80UPPER=u.dimensionless_unscaled,
     SEDEPTH80LOWER=u.dimensionless_unscaled,
     USEDEPTH80=u.dimensionless_unscaled,
-#    SEDEPTH80REF=u.deg,
-#    SEDEPTH80URL=u.deg,
     SEP=u.AU,
     SEPUPPER=u.AU,
     SEPLOWER=u.AU,
     USEP=u.AU,
-#    SEPREF=u.deg,
-#    SEPURL=u.deg,
-#    SET=u.deg,
-#    SETUPPER=u.deg,
-#    SETLOWER=u.deg,
-#    USET=u.deg,
-#    SETREF=u.deg,
-#    SETURL=u.deg,
     SHK=u.dimensionless_unscaled,
-#    SIMBADNAME=u.deg,
-#    SIMBADURL=u.deg,
-#    SPECREF=u.deg,
-#    SPECURL=u.deg,
-#    STAR=u.deg,
-#    STARDISCMETH=u.deg,
     T0=u.day,
     T0UPPER=u.day,
     T0LOWER=u.day,
     UT0=u.day,
-#    T0REF=u.deg,
-#    T0URL=u.deg,
     T14=u.day,
     T14UPPER=u.day,
     T14LOWER=u.day,
     UT14=u.day,
-#    T14REF=u.deg,
-#    T14URL=u.deg,
     TEFF=u.Kelvin,
     TEFFUPPER=u.Kelvin,
     TEFFLOWER=u.Kelvin,
     UTEFF=u.Kelvin,
-#    TEFFREF=u.deg,
-#    TEFFURL=u.deg,
-#    TIMING=u.deg,
-#    TRANSIT=u.deg,
-#    TRANSITREF=u.deg,
-#    TRANSITURL=u.deg,
-#    TREND=u.deg,
     TT=u.day,
     TTUPPER=u.day,
     TTLOWER=u.day,
     UTT=u.day,
-#    TTREF=u.deg,
-#    TTURL=u.deg,
     V=u.mag,
-#    VREF=u.deg,
-#    VURL=u.deg,
     VSINI=u.km/u.s,
     VSINIUPPER=u.km/u.s,
     VSINILOWER=u.km/u.s,
     UVSINI=u.km/u.s,
-#    VSINIREF=u.deg,
-#    VSINIURL=u.deg,
-#    KEPID=u.deg,
-#    KDE=u.deg,
 )
 
 def parse_raw_database(raw):
@@ -340,3 +201,79 @@ def parse_raw_database(raw):
     return table
 
 exoplanet_table = parse_raw_database(exoplanet_database_raw)
+
+def get_planet_index(planet, tbl=exoplanet_table):
+    return np.argwhere(planet == tbl['NAME'])[0][0]
+
+def get_FixedTarget_from_exoplanet(planet, tbl=exoplanet_table):
+    idx = get_planet_index(planet)
+    sc = SkyCoord(ra=tbl['RA'].quantity[idx], dec=tbl['DEC'].quantity[idx])
+    return FixedTarget(coord=sc, name=planet)
+
+def get_transits(planet, time_start, time_end, tbl=exoplanet_table):
+    """
+    Get mid-transit times of ``planet`` between ``time_start`` and ``time_end``.
+
+    Parameters
+    ----------
+    planet : str
+        Planet name
+
+    time_start : `~astropy.time.Time`
+        Calculate transit times after ``time_start``
+
+    time_end : `~astropy.time.Time`
+        Calculate transit times before ``time_end``
+
+    Returns
+    -------
+    times : `~astropy.time.Time`
+        Transit times between ``time_start`` and ``time_end``
+    """
+    idx = get_planet_index(planet, tbl=tbl)
+    period = tbl['PER'].quantity[idx]
+    epoch = Time(tbl['TT'].quantity[idx], format='jd')
+    start = np.ceil((time_start - epoch)/period)
+    end = np.floor((time_end - epoch)/period)
+
+    if start == end:
+        return start*period + epoch
+    elif start < end:
+        return np.arange(start, end+1, dtype=int)*period + epoch
+    else:
+        return []
+
+@u.quantity_input(horizon=u.deg)
+def transit_visible(time, observatory, planet, horizon=0*u.degree):
+    """
+    Is transit of ``planet`` visible during night of ``time`` visible
+    for an observer at ``observatory``?
+
+    Parameters
+    ----------
+    time : `~astropy.time.Time`
+        Time of observation
+
+    observatory : `~astroplan.core.Observer`
+        Observer
+
+    planet : str
+        Name of exoplanet
+    """
+    target = get_FixedTarget_from_exoplanet(planet)
+    if observatory.can_see(time, target):
+        rise_time = observatory.calc_rise(time, target, horizon=horizon,
+                                          which='previous')
+        set_time = observatory.calc_set(time, target, horizon=horizon,
+                                        which='next')
+    else:
+        rise_time = observatory.calc_rise(time, target, which='next')
+        set_time = observatory.calc_set(time, target, which='next')
+
+    transits = get_transits(planet, rise_time, set_time)
+    if hasattr(transits, 'isscalar') and transits.isscalar:
+        return True
+    elif hasattr(transits, 'isscalar') and not transits.isscalar:
+        return len(transits) > 0
+    else:
+        return False
