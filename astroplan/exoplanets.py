@@ -249,15 +249,6 @@ def get_transits(planet, time_start, time_end, tbl=exoplanet_table):
     else:
         return []
 
-from astropy.coordinates import get_sun
-def is_night(observer, time, horizon=0*u.degree):
-    # TODO: remove this method when its equivalent is merged.
-    if not isinstance(time, Time):
-        time = Time(time)
-    solar_altitude = observer.altaz(time, target=get_sun(time)).alt
-    sun_below_horizon = solar_altitude < horizon
-    return sun_below_horizon
-
 @u.quantity_input(horizon=u.deg, solar_horizon=u.deg)
 def is_transit_visible(observer, planet, mid_transit_time,
                        planet_horizon=0*u.degree, solar_horizon=-6*u.deg,
@@ -296,9 +287,8 @@ def is_transit_visible(observer, planet, mid_transit_time,
         check_times = [mid_transit_time]
 
     target = get_FixedTarget_from_exoplanet(planet)
-    # TODO replace is_night with observer.is_night(t) when it returns
     visible = [True if observer.can_see(t, target, horizon=planet_horizon) and
-                       is_night(observer, t, horizon=solar_horizon)
+                       observer.is_night(t, horizon=solar_horizon)
                else False for t in check_times]
     return all(visible)
 
