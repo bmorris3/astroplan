@@ -10,6 +10,8 @@ from astropy.constants import M_jup, M_sun, R_jup, R_sun
 import numpy as np
 from .core import FixedTarget
 
+__all__ = ["get_FixedTarget_from_exoplanet", "transit_visible"]
+
 exoplanet_database_url = "http://www.exoplanets.org/csv-files/exoplanets.csv"
 # TODO: Include a copy of the database in package? File size=~8MB
 exoplanet_database_raw = download_file(exoplanet_database_url, cache=True)
@@ -203,7 +205,10 @@ def parse_raw_database(raw):
 exoplanet_table = parse_raw_database(exoplanet_database_raw)
 
 def get_planet_index(planet, tbl=exoplanet_table):
-    return np.argwhere(planet == tbl['NAME'])[0][0]
+    index_array = np.argwhere(tbl['NAME'] == planet)
+    if len(index_array) == 0:
+        raise ValueError('Exoplanet "{}" not found.'.format(planet))
+    return index_array[0][0]
 
 def get_FixedTarget_from_exoplanet(planet, tbl=exoplanet_table):
     idx = get_planet_index(planet)
@@ -244,36 +249,34 @@ def get_transits(planet, time_start, time_end, tbl=exoplanet_table):
         return []
 
 @u.quantity_input(horizon=u.deg)
-def transit_visible(time, observatory, planet, horizon=0*u.degree):
+def transit_visible(observer, mid_transit_time, planet, horizon=0*u.degree,
+                    full_transit=True, tbl=exoplanet_table):
     """
-    Is transit of ``planet`` visible during night of ``time`` visible
-    for an observer at ``observatory``?
+    Is transit of ``planet`` at ``time`` visible for this ``observer``?
 
     Parameters
     ----------
-    time : `~astropy.time.Time`
-        Time of observation
+    mid_transit_time : `~astropy.time.Time`
+        Mid-transit time
 
-    observatory : `~astroplan.core.Observer`
+    observer : `~astroplan.core.Observer`
         Observer
 
     planet : str
         Name of exoplanet
-    """
-    target = get_FixedTarget_from_exoplanet(planet)
-    if observatory.can_see(time, target):
-        rise_time = observatory.calc_rise(time, target, horizon=horizon,
-                                          which='previous')
-        set_time = observatory.calc_set(time, target, horizon=horizon,
-                                        which='next')
-    else:
-        rise_time = observatory.calc_rise(time, target, which='next')
-        set_time = observatory.calc_set(time, target, which='next')
 
-    transits = get_transits(planet, rise_time, set_time)
-    if hasattr(transits, 'isscalar') and transits.isscalar:
-        return True
-    elif hasattr(transits, 'isscalar') and not transits.isscalar:
-        return len(transits) > 0
+    full_transit : bool
+        Require visible from first to fourth contact (True) or only
+        at mid-transit time (False)
+    """
+    if full_transit:
+        idx = get_planet_index(planet)
+        duration = tbl['T14'].quantity[idx]
+        check_times = [mid_transit_time-duration, mid_transit_time+duration]
     else:
-        return False
+        check_times = [mid_transit_time]
+
+    target = get_FixedTarget_from_exoplanet(planet)
+    visible = [True if observer.can_see(t, target) and observer.is_night(t)
+               else False for t in check_times]
+    return all(visible)
