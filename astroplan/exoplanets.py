@@ -17,6 +17,7 @@ from astropy.utils.data import download_file
 from astropy.io import ascii
 from astropy.constants import M_jup, M_sun, R_jup, R_sun
 import numpy as np
+from astropy.table import Column, hstack
 from .core import FixedTarget
 
 __all__ = ["get_FixedTarget_from_exoplanet", "is_transit_visible",
@@ -195,10 +196,10 @@ exoplanet_table_units = dict(
     TEFFUPPER=u.Kelvin,
     TEFFLOWER=u.Kelvin,
     UTEFF=u.Kelvin,
-    TT=u.day,
-    TTUPPER=u.day,
-    TTLOWER=u.day,
-    UTT=u.day,
+    # TT=u.day,
+    # TTUPPER=u.day,
+    # TTLOWER=u.day,
+    # UTT=u.day,
     V=u.mag,
     VSINI=u.km/u.s,
     VSINIUPPER=u.km/u.s,
@@ -211,17 +212,38 @@ def parse_raw_database(raw):
     for column in table.columns:
         if column in exoplanet_table_units:
             table[column].unit = exoplanet_table_units[column]
+
+    # Clean up mid-transit epoch:
+    KOIs = np.array(["KOI" in name for name in table['NAME']])
+    midtransit_epochs = np.array(table["TT"])
+    midtransit_epochs[KOIs] += 2440000
+    midtransit_epochs_astropy = []
+    for i, t in enumerate(midtransit_epochs):
+        if isinstance(t, float):
+            midtransit_epochs_astropy.append(Time(t, format='jd'))
+        else:
+            midtransit_epochs_astropy.append(np.nan)
+    #validated_TT = Column(midtransit_epochs_astropy, name="TT_validated")
+    table["TT_validated"] = midtransit_epochs_astropy
+    #table = hstack([table, validated_TT])
     return table
 
-exoplanet_table = parse_raw_database(exoplanet_database_raw)
+complete_exoplanet_table = parse_raw_database(exoplanet_database_raw)
 
-def get_planet_index(planet, tbl=exoplanet_table):
+def validate_database(tbl):
+    valid_periods = tbl['PER'] != 0 *u.day
+    valid_epochs = tbl['TT_validated'] != 0
+    return tbl[valid_periods*valid_epochs]
+
+validated_exoplanet_table = validate_database(complete_exoplanet_table)
+
+def get_planet_index(planet, tbl=validated_exoplanet_table):
     index_array = np.argwhere(tbl['NAME'] == planet)
     if len(index_array) == 0:
         raise ValueError('Exoplanet "{}" not found.'.format(planet))
     return index_array[0][0]
 
-def get_FixedTarget_from_exoplanet(planet, tbl=exoplanet_table):
+def get_FixedTarget_from_exoplanet(planet, tbl=validated_exoplanet_table):
     """
     Get `~astroplan.core.FixedTarget` object for exoplanet ``planet``.
 
@@ -236,7 +258,7 @@ def get_FixedTarget_from_exoplanet(planet, tbl=exoplanet_table):
     sc = SkyCoord(ra=tbl['RA'].quantity[idx], dec=tbl['DEC'].quantity[idx])
     return FixedTarget(coord=sc, name=planet)
 
-def get_transits(planet, time_start, time_end, tbl=exoplanet_table):
+def get_transits(planet, time_start, time_end, tbl=validated_exoplanet_table):
     """
     Get mid-transit times of ``planet`` between ``time_start`` and ``time_end``.
 
@@ -258,7 +280,7 @@ def get_transits(planet, time_start, time_end, tbl=exoplanet_table):
     """
     idx = get_planet_index(planet, tbl=tbl)
     period = tbl['PER'].quantity[idx]
-    epoch = Time(tbl['TT'].quantity[idx], format='jd')
+    epoch = tbl['TT_validated'][idx]
     start = np.ceil((time_start - epoch)/period)
     end = np.floor((time_end - epoch)/period)
 
@@ -267,12 +289,12 @@ def get_transits(planet, time_start, time_end, tbl=exoplanet_table):
     elif start < end:
         return Time(np.arange(start, end+1, dtype=int)*period + epoch)
     else:
-        return []
+        return None
 
 @u.quantity_input(horizon=u.deg, solar_horizon=u.deg)
 def is_transit_visible(observer, planet, mid_transit_time,
                        planet_horizon=0*u.degree, solar_horizon=-6*u.deg,
-                       full_transit=True, tbl=exoplanet_table):
+                       full_transit=True, tbl=validated_exoplanet_table):
     """
     Is transit of ``planet`` at ``time`` visible at night for this ``observer``?
 
@@ -315,9 +337,18 @@ def is_transit_visible(observer, planet, mid_transit_time,
 @u.quantity_input(horizon=u.deg, solar_horizon=u.deg)
 def get_visible_transits(observer, planet, start_time, end_time):
     all_transits = get_transits(planet, start_time, end_time)
-    visible_transits = Time([t for t in all_transits
-                             if is_transit_visible(observer, planet, t)])
-    return visible_transits
+
+    if all_transits is None:
+        return None
+
+    if all_transits.isscalar:
+        if is_transit_visible(observer, planet, all_transits):
+            return all_transits
+        else:
+            return None
+    else:
+        return Time([t for t in all_transits if (t is not None and
+                     is_transit_visible(observer, planet, t))])
 
 def get_available_planets():
     """
@@ -328,6 +359,6 @@ def get_available_planets():
     list
         Available planets
     """
-    return list(exoplanet_table['NAME'])
+    return list(validated_exoplanet_table['NAME'])
 
 
