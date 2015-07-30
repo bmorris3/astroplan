@@ -1,3 +1,12 @@
+# Licensed under a 3-clause BSD style license - see LICENSE.rst
+"""
+This module relies on the exoplanet database at exoplanets.org for information
+about exoplanets and their host stars, by Wright, J.T., Fakhouri, O., Marcy,
+G.W., et al. 2011, PASP, 123, 412  [1]_.
+
+.. [1] http://arxiv.org/abs/1409.7709
+"""
+
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
@@ -11,12 +20,13 @@ import numpy as np
 from .core import FixedTarget
 
 __all__ = ["get_FixedTarget_from_exoplanet", "is_transit_visible",
-           "get_visible_transits", "get_transits"]
+           "get_visible_transits", "get_transits", "get_available_planets"]
 
 exoplanet_database_url = "http://www.exoplanets.org/csv-files/exoplanets.csv"
 # TODO: Include a copy of the database in package? File size=~8MB
 exoplanet_database_raw = download_file(exoplanet_database_url, cache=True)
 
+# Collect units associated with each numeric data column of the table
 exoplanet_table_units = dict(
     A=u.AU,
     AUPPER=u.AU,
@@ -212,6 +222,16 @@ def get_planet_index(planet, tbl=exoplanet_table):
     return index_array[0][0]
 
 def get_FixedTarget_from_exoplanet(planet, tbl=exoplanet_table):
+    """
+    Get `~astroplan.core.FixedTarget` object for exoplanet ``planet``.
+
+    Parameters
+    ----------
+    planet : str
+        Name of exoplanet in exoplanets.org database [1]_.
+
+    .. [1] http://exoplanets.org
+    """
     idx = get_planet_index(planet)
     sc = SkyCoord(ra=tbl['RA'].quantity[idx], dec=tbl['DEC'].quantity[idx])
     return FixedTarget(coord=sc, name=planet)
@@ -298,3 +318,16 @@ def get_visible_transits(observer, planet, start_time, end_time):
     visible_transits = Time([t for t in all_transits
                              if is_transit_visible(observer, planet, t)])
     return visible_transits
+
+def get_available_planets():
+    """
+    List of planets available in the local copy of the exoplanets.org database.
+
+    Returns
+    -------
+    list
+        Available planets
+    """
+    return list(exoplanet_table['NAME'])
+
+
