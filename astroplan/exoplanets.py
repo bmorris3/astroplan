@@ -17,8 +17,7 @@ from astropy.utils.data import download_file
 from astropy.io import ascii
 from astropy.constants import M_jup, M_sun, R_jup, R_sun
 import numpy as np
-from astropy.table import Column, hstack
-from .core import FixedTarget
+from astropy.table import QTable
 
 __all__ = ["get_FixedTarget_from_exoplanet", "is_transit_visible",
            "get_visible_transits", "get_transits", "get_available_planets"]
@@ -47,7 +46,7 @@ exoplanet_table_units = dict(
     UBIGOM=u.deg,
     BMV=u.mag,
     CHI2=u.dimensionless_unscaled,
-    DEC=u.deg,
+    DEC=u.degree,
     DENSITY=u.g/u.cm**3,
     DENSITYUPPER=u.g/u.cm**3,
     DENSITYLOWER=u.g/u.cm**3,
@@ -207,12 +206,31 @@ exoplanet_table_units = dict(
     UVSINI=u.km/u.s,
 )
 
-def parse_raw_database(raw):
-    table = ascii.read(raw)
+def parse_raw_database(raw_CSV_file):
+    """
+    Read the exoplanets.org CSV database file [1]_ into a
+    `~astropy.table.QTable`.
+
+    Do some data whitening (i.e. convert times to JD), initialize astropy
+    objects and apply units wherever possible.
+
+    .. [1] http://www.exoplanets.org/csv-files/exoplanets.csv
+
+    Parameters
+    ----------
+    raw_CSV_file : str
+        Path to exoplanets.org CSV database
+
+    Returns
+    -------
+    table : `~astropy.table.QTable`
+
+    """
+    table = ascii.read(raw_CSV_file, format='fast_csv')
     for column in table.columns:
         if column in exoplanet_table_units:
             table[column].unit = exoplanet_table_units[column]
-
+    table = QTable(table)
     # Clean up mid-transit epoch:
     KOIs = np.array(["KOI" in name for name in table['NAME']])
     midtransit_epochs = np.array(table["TT"])
@@ -223,42 +241,74 @@ def parse_raw_database(raw):
             midtransit_epochs_astropy.append(Time(t, format='jd'))
         else:
             midtransit_epochs_astropy.append(np.nan)
-    #validated_TT = Column(midtransit_epochs_astropy, name="TT_validated")
+
     table["TT_validated"] = midtransit_epochs_astropy
-    #table = hstack([table, validated_TT])
+
+    # Using mixin column, this is an order of magnitude faster than
+    # initializing a SkyCoord for each planet individually
+    table["SkyCoord"] = SkyCoord(ra=table['RA'], dec=table['DEC'], frame='icrs')
     return table
 
-complete_exoplanet_table = parse_raw_database(exoplanet_database_raw)
+def validate_transit_database(tbl):
+    """
+    Create a copy of the exoplanet database table ``tbl`` for transit
+    computations.
 
-def validate_database(tbl):
+    The new table will only have the planets that have well-defined periods and
+    mid-transit epochs.
+
+    Parameters
+    ----------
+    tbl : `~astropy.table.QTable` (optional)
+        Exoplanet database table.
+    """
     valid_periods = tbl['PER'] != 0 *u.day
     valid_epochs = tbl['TT_validated'] != 0
     return tbl[valid_periods*valid_epochs]
 
-validated_exoplanet_table = validate_database(complete_exoplanet_table)
+complete_exoplanet_table = parse_raw_database(exoplanet_database_raw)
+transiting_exoplanets = validate_transit_database(complete_exoplanet_table)
 
-def get_planet_index(planet, tbl=validated_exoplanet_table):
+def get_planet_index(planet, tbl=complete_exoplanet_table):
+    """
+    Get the row index of ``planet`` in exoplanet database table ``tbl``.
+
+    Parameters
+    ----------
+    planet : str
+        Exoplanet name
+
+    tbl : `~astropy.table.QTable` (optional)
+        Exoplanet database table.
+
+    Returns
+    -------
+    index : int
+        Row index of the exoplanet database table corresponding to ``planet``
+    """
     index_array = np.argwhere(tbl['NAME'] == planet)
     if len(index_array) == 0:
         raise ValueError('Exoplanet "{}" not found.'.format(planet))
     return index_array[0][0]
 
-def get_FixedTarget_from_exoplanet(planet, tbl=validated_exoplanet_table):
+def get_skycoord(planet, tbl=complete_exoplanet_table):
     """
-    Get `~astroplan.core.FixedTarget` object for exoplanet ``planet``.
+    Get `~astropy.coordinates.SkyCoord` object for exoplanet ``planet``.
 
     Parameters
     ----------
     planet : str
         Name of exoplanet in exoplanets.org database [1]_.
 
+    tbl : `~astropy.table.QTable` (optional)
+        Exoplanet database table.
+
     .. [1] http://exoplanets.org
     """
-    idx = get_planet_index(planet)
-    sc = SkyCoord(ra=tbl['RA'].quantity[idx], dec=tbl['DEC'].quantity[idx])
-    return FixedTarget(coord=sc, name=planet)
+    idx = get_planet_index(planet, tbl=tbl)
+    return tbl['SkyCoord'][idx]
 
-def get_transits(planet, time_start, time_end, tbl=validated_exoplanet_table):
+def get_transits(planet, time_start, time_end, tbl=transiting_exoplanets):
     """
     Get mid-transit times of ``planet`` between ``time_start`` and ``time_end``.
 
@@ -273,13 +323,16 @@ def get_transits(planet, time_start, time_end, tbl=validated_exoplanet_table):
     time_end : `~astropy.time.Time`
         Calculate transit times before ``time_end``
 
+    tbl : `~astropy.table.QTable` (optional)
+        Exoplanet database table.
+
     Returns
     -------
     times : `~astropy.time.Time`
         Transit times between ``time_start`` and ``time_end``
     """
     idx = get_planet_index(planet, tbl=tbl)
-    period = tbl['PER'].quantity[idx]
+    period = tbl['PER'][idx] * tbl['PER'].unit
     epoch = tbl['TT_validated'][idx]
     start = np.ceil((time_start - epoch)/period)
     end = np.floor((time_end - epoch)/period)
@@ -294,7 +347,7 @@ def get_transits(planet, time_start, time_end, tbl=validated_exoplanet_table):
 @u.quantity_input(horizon=u.deg, solar_horizon=u.deg)
 def is_transit_visible(observer, planet, mid_transit_time,
                        planet_horizon=0*u.degree, solar_horizon=-6*u.deg,
-                       full_transit=True, tbl=validated_exoplanet_table):
+                       full_transit=True, tbl=transiting_exoplanets):
     """
     Is transit of ``planet`` at ``time`` visible at night for this ``observer``?
 
@@ -320,6 +373,9 @@ def is_transit_visible(observer, planet, mid_transit_time,
     full_transit : bool
         Require visible from first to fourth contact (True) or only
         at mid-transit time (False)
+
+    tbl : `~astropy.table.QTable` (optional)
+        Exoplanet database table.
     """
     if full_transit:
         idx = get_planet_index(planet)
@@ -328,27 +384,65 @@ def is_transit_visible(observer, planet, mid_transit_time,
     else:
         check_times = [mid_transit_time]
 
-    target = get_FixedTarget_from_exoplanet(planet)
+    target = get_skycoord(planet)
     visible = [True if observer.can_see(t, target, horizon=planet_horizon) and
                        observer.is_night(t, horizon=solar_horizon)
                else False for t in check_times]
     return all(visible)
 
-@u.quantity_input(horizon=u.deg, solar_horizon=u.deg)
-def get_visible_transits(observer, planet, start_time, end_time):
-    all_transits = get_transits(planet, start_time, end_time)
+@u.quantity_input(planet_horizon=u.deg, solar_horizon=u.deg)
+def get_visible_transits(observer, planet, start_time, end_time,
+                         planet_horizon=0*u.degree, solar_horizon=-6*u.deg,
+                         full_transit=True, tbl=transiting_exoplanets):
+    """
+    Calculate mid-transit times of visible transits within a time range.
 
+    Parameters
+    ----------
+    observer : `~astroplan.core.Observer`
+        Observer location and environment.
+
+    planet : str
+        Exoplanet name
+
+    start_time : `~astropy.time.Time`
+        Earliest time to consider
+
+    end_time : `~astropy.time.Time`
+        Latest time to consider
+
+    planet_horizon : `~astropy.units.Quantity` (optional)
+        Minimum altitude of the planet during the transit
+
+    solar_horizon : `~astropy.units.Quantity` (optional)
+        Maximum altitude of the Sun at the time of transit for the transit
+        to be considered "visible"
+
+    full_transit : bool (optional)
+        If True, the transit will only be considered visible if the planet is
+        visible from first to fourth contact (the full transit duration), else
+        only checks the mid-transit time.
+
+    tbl : `~astropy.table.QTable` (optional)
+        Exoplanet database table.
+    """
+    all_transits = get_transits(planet, start_time, end_time)
+    is_transit_visible_kwargs = dict(planet_horizon=planet_horizon,
+                                     solar_horizon=solar_horizon,
+                                     full_transit=full_transit, tbl=tbl)
     if all_transits is None:
         return None
 
     if all_transits.isscalar:
-        if is_transit_visible(observer, planet, all_transits):
+        if is_transit_visible(observer, planet, all_transits,
+                              **is_transit_visible_kwargs):
             return all_transits
         else:
             return None
     else:
         return Time([t for t in all_transits if (t is not None and
-                     is_transit_visible(observer, planet, t))])
+                     is_transit_visible(observer, planet, t,
+                                        **is_transit_visible_kwargs))])
 
 def get_available_planets():
     """
@@ -359,6 +453,4 @@ def get_available_planets():
     list
         Available planets
     """
-    return list(validated_exoplanet_table['NAME'])
-
-
+    return list(complete_exoplanet_table['NAME'])
