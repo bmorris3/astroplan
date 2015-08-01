@@ -332,7 +332,7 @@ def get_transits(planet, time_start, time_end, tbl=transiting_exoplanets):
         Transit times between ``time_start`` and ``time_end``
     """
     idx = get_planet_index(planet, tbl=tbl)
-    period = tbl['PER'][idx] * tbl['PER'].unit
+    period = tbl['PER'][idx]
     epoch = tbl['TT_validated'][idx]
     start = np.ceil((time_start - epoch)/period)
     end = np.floor((time_end - epoch)/period)
@@ -378,8 +378,8 @@ def is_transit_visible(observer, planet, mid_transit_time,
         Exoplanet database table.
     """
     if full_transit:
-        idx = get_planet_index(planet)
-        duration = tbl['T14'].quantity[idx]
+        idx = get_planet_index(planet, tbl=tbl)
+        duration = tbl['T14'][idx]
         check_times = [mid_transit_time-duration, mid_transit_time+duration]
     else:
         check_times = [mid_transit_time]
@@ -426,7 +426,7 @@ def get_visible_transits(observer, planet, start_time, end_time,
     tbl : `~astropy.table.QTable` (optional)
         Exoplanet database table.
     """
-    all_transits = get_transits(planet, start_time, end_time)
+    all_transits = get_transits(planet, start_time, end_time, tbl=tbl)
     is_transit_visible_kwargs = dict(planet_horizon=planet_horizon,
                                      solar_horizon=solar_horizon,
                                      full_transit=full_transit, tbl=tbl)
@@ -440,9 +440,14 @@ def get_visible_transits(observer, planet, start_time, end_time,
         else:
             return None
     else:
-        return Time([t for t in all_transits if (t is not None and
-                     is_transit_visible(observer, planet, t,
-                                        **is_transit_visible_kwargs))])
+        print(all_transits, type(all_transits))
+        visible_transits = [t for t in all_transits if (t is not None and
+                            is_transit_visible(observer, planet, t,
+                                               **is_transit_visible_kwargs))]
+        if len(visible_transits) > 0:
+            return Time(visible_transits)
+        else:
+            return None
 
 def get_available_planets():
     """
