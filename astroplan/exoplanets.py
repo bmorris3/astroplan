@@ -14,7 +14,6 @@ from astropy.coordinates import (Latitude, Longitude, SkyCoord)
 import astropy.units as u
 from astropy.time import Time
 from astropy.utils.data import download_file
-from astropy.io import ascii
 from astropy.constants import M_jup, M_sun, R_jup, R_sun
 import numpy as np
 from astropy.table import QTable
@@ -226,11 +225,11 @@ def parse_raw_database(raw_CSV_file):
     table : `~astropy.table.QTable`
 
     """
-    table = ascii.read(raw_CSV_file, format='fast_csv')
+    table = QTable.read(raw_CSV_file, format='csv')
     for column in table.columns:
         if column in exoplanet_table_units:
             table[column].unit = exoplanet_table_units[column]
-    table = QTable(table)
+
     # Clean up mid-transit epoch:
     KOIs = np.array(["KOI" in name for name in table['NAME']])
     midtransit_epochs = np.array(table["TT"])
