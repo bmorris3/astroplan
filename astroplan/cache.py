@@ -12,7 +12,7 @@ from astropy.extern.six.moves import cPickle as pickle
 
 __all__ = ["unpickle_data", "pickle_data"]
 
-def _find_or_create_astroplan_dir(dirnm, linkto=None):
+def _find_or_create_astroplan_dir(dirnm):
     """
     Adapted for astroplan from astropy.config.paths._find_or_create_astropy_dir
     """
@@ -36,11 +36,6 @@ def _find_or_create_astroplan_dir(dirnm, linkto=None):
         except OSError:
             if not os.path.isdir(maindir):
                 raise
-
-        if (not sys.platform.startswith('win') and
-            linkto is not None and
-                not os.path.exists(linkto)):
-            os.symlink(maindir, linkto)
 
     elif not os.path.isdir(maindir):
         msg = 'Intended astroplan {0} directory {1} is actually a file.'
