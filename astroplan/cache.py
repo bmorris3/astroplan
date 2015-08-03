@@ -10,7 +10,7 @@ import os
 import sys
 from astropy.extern.six.moves import cPickle as pickle
 
-__all__ = []
+__all__ = ["unpickle_data", "pickle_data"]
 
 def _find_or_create_astroplan_dir(dirnm, linkto=None):
     """

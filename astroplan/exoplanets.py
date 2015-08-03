@@ -18,8 +18,7 @@ from astropy.constants import M_jup, M_sun, R_jup, R_sun
 import numpy as np
 from astropy.table import QTable
 
-__all__ = ["get_FixedTarget_from_exoplanet", "is_transit_visible",
-           "get_visible_transits", "get_transits", "get_available_planets"]
+__all__ = ["Exoplanets"]
 
 exoplanet_database_url = "http://www.exoplanets.org/csv-files/exoplanets.csv"
 # TODO: Include a copy of the database in package? File size=~8MB
@@ -261,200 +260,216 @@ def validate_transit_database(tbl):
     tbl : `~astropy.table.QTable` (optional)
         Exoplanet database table.
     """
+    is_transiting = tbl['TRANSIT'] == 1
     valid_periods = tbl['PER'] != 0 *u.day
     valid_epochs = tbl['TT_validated'] != 0
-    return tbl[valid_periods*valid_epochs]
+    return tbl[is_transiting*valid_periods*valid_epochs]
 
-complete_exoplanet_table = parse_raw_database(exoplanet_database_raw)
-transiting_exoplanets = validate_transit_database(complete_exoplanet_table)
-
-def get_planet_index(planet, tbl=complete_exoplanet_table):
+class Exoplanets(object):
     """
-    Get the row index of ``planet`` in exoplanet database table ``tbl``.
-
-    Parameters
-    ----------
-    planet : str
-        Exoplanet name
-
-    tbl : `~astropy.table.QTable` (optional)
-        Exoplanet database table.
-
-    Returns
-    -------
-    index : int
-        Row index of the exoplanet database table corresponding to ``planet``
+    Container for exoplanet database table and associated methods.
     """
-    index_array = np.argwhere(tbl['NAME'] == planet)
-    if len(index_array) == 0:
-        raise ValueError('Exoplanet "{}" not found.'.format(planet))
-    return index_array[0][0]
+    def __init__(self, transiting=True):
+        """
+        Initialize an exoplanet database object.
 
-def get_skycoord(planet, tbl=complete_exoplanet_table):
-    """
-    Get `~astropy.coordinates.SkyCoord` object for exoplanet ``planet``.
-
-    Parameters
-    ----------
-    planet : str
-        Name of exoplanet in exoplanets.org database [1]_.
-
-    tbl : `~astropy.table.QTable` (optional)
-        Exoplanet database table.
-
-    .. [1] http://exoplanets.org
-    """
-    idx = get_planet_index(planet, tbl=tbl)
-    return tbl['SkyCoord'][idx]
-
-def get_transits(planet, time_start, time_end, tbl=transiting_exoplanets):
-    """
-    Get mid-transit times of ``planet`` between ``time_start`` and ``time_end``.
-
-    Parameters
-    ----------
-    planet : str
-        Planet name
-
-    time_start : `~astropy.time.Time`
-        Calculate transit times after ``time_start``
-
-    time_end : `~astropy.time.Time`
-        Calculate transit times before ``time_end``
-
-    tbl : `~astropy.table.QTable` (optional)
-        Exoplanet database table.
-
-    Returns
-    -------
-    times : `~astropy.time.Time`
-        Transit times between ``time_start`` and ``time_end``
-    """
-    idx = get_planet_index(planet, tbl=tbl)
-    period = tbl['PER'][idx]
-    epoch = tbl['TT_validated'][idx]
-    start = np.ceil((time_start - epoch)/period)
-    end = np.floor((time_end - epoch)/period)
-
-    if start == end:
-        return start*period + epoch
-    elif start < end:
-        return Time(np.arange(start, end+1, dtype=int)*period + epoch)
-    else:
-        return None
-
-@u.quantity_input(horizon=u.deg, solar_horizon=u.deg)
-def is_transit_visible(observer, planet, mid_transit_time,
-                       planet_horizon=0*u.degree, solar_horizon=-6*u.deg,
-                       full_transit=True, tbl=transiting_exoplanets):
-    """
-    Is transit of ``planet`` at ``time`` visible at night for this ``observer``?
-
-    "At night" is defined as times when the Sun is below ``solar_horizon``.
-
-    Parameters
-    ----------
-    mid_transit_time : `~astropy.time.Time`
-        Mid-transit time
-
-    observer : `~astroplan.core.Observer`
-        Observer
-
-    planet : str
-        Name of exoplanet
-
-    planet_horizon : `~astropy.units.Quantity` (optional)
-        Minimum altitude of the planet required to be "visible"
-
-    solar_horizon : `~astropy.units.Quantity` (optional)
-        Maximum altitude of the Sun defining which transits occur "at night"
-
-    full_transit : bool
-        Require visible from first to fourth contact (True) or only
-        at mid-transit time (False)
-
-    tbl : `~astropy.table.QTable` (optional)
-        Exoplanet database table.
-    """
-    if full_transit:
-        idx = get_planet_index(planet, tbl=tbl)
-        duration = tbl['T14'][idx]
-        check_times = [mid_transit_time-duration, mid_transit_time+duration]
-    else:
-        check_times = [mid_transit_time]
-
-    target = get_skycoord(planet)
-    visible = [True if observer.can_see(t, target, horizon=planet_horizon) and
-                       observer.is_night(t, horizon=solar_horizon)
-               else False for t in check_times]
-    return all(visible)
-
-@u.quantity_input(planet_horizon=u.deg, solar_horizon=u.deg)
-def get_visible_transits(observer, planet, start_time, end_time,
-                         planet_horizon=0*u.degree, solar_horizon=-6*u.deg,
-                         full_transit=True, tbl=transiting_exoplanets):
-    """
-    Calculate mid-transit times of visible transits within a time range.
-
-    Parameters
-    ----------
-    observer : `~astroplan.core.Observer`
-        Observer location and environment.
-
-    planet : str
-        Exoplanet name
-
-    start_time : `~astropy.time.Time`
-        Earliest time to consider
-
-    end_time : `~astropy.time.Time`
-        Latest time to consider
-
-    planet_horizon : `~astropy.units.Quantity` (optional)
-        Minimum altitude of the planet during the transit
-
-    solar_horizon : `~astropy.units.Quantity` (optional)
-        Maximum altitude of the Sun at the time of transit for the transit
-        to be considered "visible"
-
-    full_transit : bool (optional)
-        If True, the transit will only be considered visible if the planet is
-        visible from first to fourth contact (the full transit duration), else
-        only checks the mid-transit time.
-
-    tbl : `~astropy.table.QTable` (optional)
-        Exoplanet database table.
-    """
-    all_transits = get_transits(planet, start_time, end_time, tbl=tbl)
-    is_transit_visible_kwargs = dict(planet_horizon=planet_horizon,
-                                     solar_horizon=solar_horizon,
-                                     full_transit=full_transit, tbl=tbl)
-    if all_transits is None:
-        return None
-
-    if all_transits.isscalar:
-        if is_transit_visible(observer, planet, all_transits,
-                              **is_transit_visible_kwargs):
-            return all_transits
+        Parameters
+        ----------
+        transiting : bool (optional)
+            Use a exoplanet database validated for transiting planets only
+            (if True), else use the complete table from exoplanets.org (use at
+            your own peril!)
+        """
+        db = parse_raw_database(exoplanet_database_raw)
+        if transiting:
+            self.tbl = validate_transit_database(db)
         else:
-            return None
-    else:
-        print(all_transits, type(all_transits))
-        visible_transits = [t for t in all_transits if (t is not None and
-                            is_transit_visible(observer, planet, t,
-                                               **is_transit_visible_kwargs))]
-        if len(visible_transits) > 0:
-            return Time(visible_transits)
+            self.tbl = db
+
+    def get_planet_index(self, planet):
+        """
+        Get the row index of ``planet`` in exoplanet database table ``tbl``.
+
+        Parameters
+        ----------
+        planet : str
+            Exoplanet name
+
+        Returns
+        -------
+        index : int
+            Row index of the exoplanet database table corresponding to ``planet``
+        """
+        index_array = np.argwhere(self.tbl['NAME'] == planet)
+        if len(index_array) == 0:
+            raise ValueError('Exoplanet "{}" not found.'.format(planet))
+        return index_array[0][0]
+
+    def get_skycoord(self, planet):
+        """
+        Get `~astropy.coordinates.SkyCoord` object for exoplanet ``planet``.
+
+        Parameters
+        ----------
+        planet : str
+            Name of exoplanet in exoplanets.org database [1]_.
+
+        .. [1] http://exoplanets.org
+        """
+        idx = self.get_planet_index(planet)
+        return self.tbl['SkyCoord'][idx]
+
+    def get_transits(self, planet, time_start, time_end):
+        """
+        Get mid-transit times of ``planet`` between ``time_start`` and
+        ``time_end``.
+
+        Parameters
+        ----------
+        planet : str
+            Planet name
+
+        time_start : `~astropy.time.Time`
+            Calculate transit times after ``time_start``
+
+        time_end : `~astropy.time.Time`
+            Calculate transit times before ``time_end``
+
+        Returns
+        -------
+        times : `~astropy.time.Time`
+            Transit times between ``time_start`` and ``time_end``
+        """
+        idx = self.get_planet_index(planet)
+        period = self.tbl['PER'][idx]
+        epoch = self.tbl['TT_validated'][idx]
+        start = np.ceil((time_start - epoch)/period)
+        end = np.floor((time_end - epoch)/period)
+
+        if start == end:
+            return start*period + epoch
+        elif start < end:
+            return Time(np.arange(start, end+1, dtype=int)*period + epoch)
         else:
             return None
 
-def get_available_planets():
-    """
-    List of planets available in the local copy of the exoplanets.org database.
+    @u.quantity_input(horizon=u.deg, solar_horizon=u.deg)
+    def is_transit_visible(self, observer, planet, mid_transit_time,
+                           planet_horizon=0*u.degree, solar_horizon=-6*u.deg,
+                           full_transit=True):
+        """
+        Is transit of ``planet`` at ``time`` visible at night for this
+        ``observer``?
 
-    Returns
-    -------
-    list
-        Available planets
-    """
-    return list(complete_exoplanet_table['NAME'])
+        "At night" is defined as times when the Sun is below ``solar_horizon``.
+
+        Parameters
+        ----------
+        mid_transit_time : `~astropy.time.Time`
+            Mid-transit time
+
+        observer : `~astroplan.core.Observer`
+            Observer
+
+        planet : str
+            Name of exoplanet
+
+        planet_horizon : `~astropy.units.Quantity` (optional)
+            Minimum altitude of the planet required to be "visible"
+
+        solar_horizon : `~astropy.units.Quantity` (optional)
+            Maximum altitude of the Sun defining which transits occur "at night"
+
+        full_transit : bool
+            Require visible from first to fourth contact (True) or only
+            at mid-transit time (False)
+
+        Returns
+        -------
+        visible : bool
+            True if transit is visible, else false.
+        """
+        if full_transit:
+            idx = self.get_planet_index(planet)
+            duration = self.tbl['T14'][idx]
+            check_times = [mid_transit_time-duration, mid_transit_time+duration]
+        else:
+            check_times = [mid_transit_time]
+
+        target = self.get_skycoord(planet)
+        visible = [True if observer.can_see(t, target, horizon=planet_horizon)
+                           and observer.is_night(t, horizon=solar_horizon)
+                   else False for t in check_times]
+        return all(visible)
+
+    @u.quantity_input(planet_horizon=u.deg, solar_horizon=u.deg)
+    def get_visible_transits(self, observer, planet, start_time, end_time,
+                             planet_horizon=0*u.degree, solar_horizon=-6*u.deg,
+                             full_transit=True):
+        """
+        Calculate mid-transit times of visible transits within a time range.
+
+        Parameters
+        ----------
+        observer : `~astroplan.core.Observer`
+            Observer location and environment.
+
+        planet : str
+            Exoplanet name
+
+        start_time : `~astropy.time.Time`
+            Earliest time to consider
+
+        end_time : `~astropy.time.Time`
+            Latest time to consider
+
+        planet_horizon : `~astropy.units.Quantity` (optional)
+            Minimum altitude of the planet during the transit
+
+        solar_horizon : `~astropy.units.Quantity` (optional)
+            Maximum altitude of the Sun at the time of transit for the transit
+            to be considered "visible"
+
+        full_transit : bool (optional)
+            If True, the transit will only be considered visible if the planet is
+            visible from first to fourth contact (the full transit duration), else
+            only checks the mid-transit time.
+
+        Returns
+        -------
+        times : `~astropy.time.Time` or None
+            Times of transits visible to ``observer``
+        """
+        all_transits = self.get_transits(planet, start_time, end_time)
+        is_transit_visible_kwargs = dict(planet_horizon=planet_horizon,
+                                         solar_horizon=solar_horizon,
+                                         full_transit=full_transit)
+        if all_transits is None:
+            return None
+
+        if all_transits.isscalar:
+            if self.is_transit_visible(observer, planet, all_transits,
+                                       **is_transit_visible_kwargs):
+                return all_transits
+            else:
+                return None
+        else:
+            print(all_transits, type(all_transits))
+            visible_transits = [t for t in all_transits if (t is not None and
+                                self.is_transit_visible(observer, planet, t,
+                                                        **is_transit_visible_kwargs))]
+            if len(visible_transits) > 0:
+                return Time(visible_transits)
+            else:
+                return None
+
+    def get_available_planets(self):
+        """
+        List of planets available in the local copy of the exoplanets.org database.
+
+        Returns
+        -------
+        list
+            Available planets
+        """
+        return list(self.tbl['NAME'])
