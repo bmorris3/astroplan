@@ -7,14 +7,13 @@ from __future__ import (absolute_import, division, print_function,
 
 from astropy.config.paths import get_cache_dir
 import os
-import sys
 from astropy.extern.six.moves import cPickle as pickle
 
-__all__ = ["unpickle_data", "pickle_data"]
+__all__ = ["unpickle_data", "pickle_data", "pickle_exists"]
 
 def _find_or_create_astroplan_dir(dirnm):
     """
-    Adapted for astroplan from astropy.config.paths._find_or_create_astropy_dir
+    Adapted for astroplan from astropy.config.paths._find_or_create_astropy_dir.
     """
     innerdir = os.path.join(get_cache_dir(), 'astroplan')
     maindir = os.path.join(get_cache_dir(), 'astroplan', dirnm)
@@ -79,3 +78,21 @@ def unpickle_data(file_name):
     with open(pickle_path, 'rb') as f:
         data = pickle.load(f)
     return data
+
+def pickle_exists(file_name):
+    """
+    Does file ``file_name`` exist in the astroplan cache?
+
+    Parameters
+    ----------
+    file_name : str
+        Path to cached file
+
+    Returns
+    -------
+    file_exists : bool
+        True if file exists.
+
+    """
+    return os.path.exists(os.path.join(_find_or_create_astroplan_dir('data'),
+                                       file_name))

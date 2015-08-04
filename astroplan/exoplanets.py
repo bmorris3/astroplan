@@ -10,19 +10,16 @@ G.W., et al. 2011, PASP, 123, 412  [1]_.
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from astropy.coordinates import (Latitude, Longitude, SkyCoord)
+from astropy.coordinates import SkyCoord
 import astropy.units as u
 from astropy.time import Time
-from astropy.utils.data import download_file
+from astropy.utils.data import download_file, clear_download_cache
 from astropy.constants import M_jup, M_sun, R_jup, R_sun
 import numpy as np
 from astropy.table import QTable
+from .cache import pickle_exists, pickle_data, unpickle_data
 
 __all__ = ["Exoplanets"]
-
-exoplanet_database_url = "http://www.exoplanets.org/csv-files/exoplanets.csv"
-# TODO: Include a copy of the database in package? File size=~8MB
-exoplanet_database_raw = download_file(exoplanet_database_url, cache=True)
 
 # Collect units associated with each numeric data column of the table
 exoplanet_table_units = dict(
@@ -204,6 +201,28 @@ exoplanet_table_units = dict(
     UVSINI=u.km/u.s,
 )
 
+def download_exoplanet_table(refresh=False, show_progress=False):
+    """
+    Download the exoplanets.org table to the astropy cache.
+
+    Parameters
+    ----------
+    refresh : bool (optional)
+        Download a fresh copy of the exoplanets.org table if True, else use
+        a cached copy if one exists.
+
+    Returns
+    -------
+    exoplanet_database_raw : str
+        Path to the cached exoplanets.org table
+    """
+    exoplanet_database_url = "http://www.exoplanets.org/csv-files/exoplanets.csv"
+    # File size=~8MB
+    if refresh:
+        clear_download_cache(exoplanet_database_url)
+    return download_file(exoplanet_database_url, cache=True,
+                         show_progress=show_progress)
+
 def parse_raw_database(raw_CSV_file):
     """
     Read the exoplanets.org CSV database file [1]_ into a
@@ -226,6 +245,7 @@ def parse_raw_database(raw_CSV_file):
     """
     table = QTable.read(raw_CSV_file, format='csv')
     for column in table.columns:
+        # Insert units
         if column in exoplanet_table_units:
             table[column].unit = exoplanet_table_units[column]
 
@@ -238,7 +258,7 @@ def parse_raw_database(raw_CSV_file):
         if isinstance(t, float):
             midtransit_epochs_astropy.append(Time(t, format='jd'))
         else:
-            midtransit_epochs_astropy.append(np.nan)
+            midtransit_epochs_astropy.append(Time(0, format='jd'))
 
     table["TT_validated"] = midtransit_epochs_astropy
 
@@ -247,7 +267,7 @@ def parse_raw_database(raw_CSV_file):
     table["SkyCoord"] = SkyCoord(ra=table['RA'], dec=table['DEC'], frame='icrs')
     return table
 
-def validate_transit_database(tbl):
+def extract_transiting_database(tbl):
     """
     Create a copy of the exoplanet database table ``tbl`` for transit
     computations.
@@ -269,7 +289,8 @@ class Exoplanets(object):
     """
     Container for exoplanet database table and associated methods.
     """
-    def __init__(self, transiting=True):
+    def __init__(self, transiting=True, refresh_database=False,
+                 show_progress=False):
         """
         Initialize an exoplanet database object.
 
@@ -279,12 +300,17 @@ class Exoplanets(object):
             Use a exoplanet database validated for transiting planets only
             (if True), else use the complete table from exoplanets.org (use at
             your own peril!)
+
+        refresh_database : bool (optional)
+            If True, download a copy of the exoplanets.org database to use.
+
+        show_progress : bool (optional)
+            Show database download progress (if `refresh_database`=True).
         """
-        db = parse_raw_database(exoplanet_database_raw)
-        if transiting:
-            self.tbl = validate_transit_database(db)
-        else:
-            self.tbl = db
+        database_cache_path = download_exoplanet_table(refresh=refresh_database,
+                                                       show_progress=show_progress)
+        db = parse_raw_database(database_cache_path)
+        self.tbl = extract_transiting_database(db) if transiting else db
 
     def get_planet_index(self, planet):
         """
