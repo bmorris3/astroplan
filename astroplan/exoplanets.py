@@ -480,10 +480,9 @@ class Exoplanets(object):
             else:
                 return None
         else:
-            print(all_transits, type(all_transits))
-            visible_transits = [t for t in all_transits if (t is not None and
-                                self.is_transit_visible(observer, planet, t,
-                                                        **is_transit_visible_kwargs))]
+            visible_transits = Time([t for t in all_transits if (t is not None and
+                                     self.is_transit_visible(observer, planet, t,
+                                                        **is_transit_visible_kwargs))])
             if len(visible_transits) > 0:
                 return Time(visible_transits)
             else:
