@@ -423,7 +423,7 @@ class Exoplanets(object):
             check_times = [mid_transit_time]
 
         target = self.get_skycoord(planet)
-        visible = [True if observer.can_see(t, target, horizon=planet_horizon)
+        visible = [True if observer.target_is_up(t, target, horizon=planet_horizon)
                            and observer.is_night(t, horizon=solar_horizon)
                    else False for t in check_times]
         return all(visible)
