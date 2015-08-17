@@ -6,69 +6,81 @@ from astroplan.solar_system import (mercury, venus, mars, jupiter, saturn,
 from astropy.time import Time
 from astroplan import get_site
 import astropy.units as u
-from astropy.tests.helper import assert_quantity_allclose
-
-separation_tolerance = 1*u.degree
-time = Time("1980-08-13 00:00:00")
-apo = get_site("APO")
-ap_merc = mercury(time, apo)
-ap_v = venus(time, apo)
-ap_m = mars(time, apo)
-ap_j = jupiter(time, apo)
-ap_s = saturn(time, apo)
-ap_u = uranus(time, apo)
-ap_n = neptune(time, apo)
-ap_p = pluto(time, apo)
-
+from numpy.testing import assert_allclose
 import ephem
-obs = ephem.Observer()
-obs.lat = apo.latitude.radian
-obs.lon = apo.longitude.radian
 
-pe_merc = ephem.Mercury()
-pe_merc.compute(obs)
-assert_quantity_allclose([ap_merc.ra, ap_merc.dec],
-                         [float(pe_merc.ra)*u.rad, float(pe_merc.dec)*u.rad],
-                         atol=separation_tolerance)
+def print_pyephem_planet_coords():
+    time = Time("1980-08-13 00:00:00")
+    apo = get_site("APO")
+    obs = ephem.Observer()
+    obs.lat = apo.latitude.radian
+    obs.lon = apo.longitude.radian
+    obs.elevation = apo.height.value
+    obs.date = time.datetime
 
-pe_v = ephem.Venus()
-pe_v.compute(obs)
-assert_quantity_allclose([ap_v.ra, ap_v.dec],
-                         [float(pe_v.ra)*u.rad, float(pe_v.dec)*u.rad],
-                         atol=separation_tolerance)
+    pe_merc = ephem.Mercury()
+    pe_merc.compute(obs)
 
-pe_m = ephem.Mars()
-pe_m.compute(obs)
-assert_quantity_allclose([ap_m.ra, ap_m.dec],
-                         [float(pe_m.ra)*u.rad, float(pe_m.dec)*u.rad],
-                         atol=separation_tolerance)
+    pe_v = ephem.Venus()
+    pe_v.compute(obs)
 
-pe_j = ephem.Jupiter()
-pe_j.compute(obs)
-assert_quantity_allclose([ap_j.ra, ap_j.dec],
-                         [float(pe_j.ra)*u.rad, float(pe_j.dec)*u.rad],
-                         atol=separation_tolerance)
+    pe_m = ephem.Mars()
+    pe_m.compute(obs)
 
-pe_s = ephem.Saturn()
-pe_s.compute(obs)
-assert_quantity_allclose([ap_s.ra, ap_s.dec],
-                         [float(pe_s.ra)*u.rad, float(pe_s.dec)*u.rad],
-                         atol=separation_tolerance)
 
-pe_u = ephem.Uranus()
-pe_u.compute(obs)
-assert_quantity_allclose([ap_u.ra, ap_u.dec],
-                         [float(pe_u.ra)*u.rad, float(pe_u.dec)*u.rad],
-                         atol=separation_tolerance)
+    pe_j = ephem.Jupiter()
+    pe_j.compute(obs)
 
-pe_n = ephem.Neptune()
-pe_n.compute(obs)
-assert_quantity_allclose([ap_n.ra, ap_n.dec],
-                         [float(pe_n.ra)*u.rad, float(pe_n.dec)*u.rad],
-                         atol=separation_tolerance)
+    pe_s = ephem.Saturn()
+    pe_s.compute(obs)
 
-pe_p = ephem.Pluto()
-pe_p.compute(obs)
-assert_quantity_allclose([ap_p.ra, ap_p.dec],
-                         [float(pe_p.ra)*u.rad, float(pe_p.dec)*u.rad],
-                         atol=separation_tolerance)
+
+    pe_u = ephem.Uranus()
+    pe_u.compute(obs)
+
+    pe_n = ephem.Neptune()
+    pe_n.compute(obs)
+
+    pe_p = ephem.Pluto()
+    pe_p.compute(obs)
+
+    print([[float(pe_merc.a_ra), float(pe_merc.a_dec)],
+            [float(pe_v.a_ra), float(pe_v.a_dec)],
+            [float(pe_m.a_ra), float(pe_m.a_dec)],
+            [float(pe_j.a_ra), float(pe_j.a_dec)],
+            [float(pe_s.a_ra), float(pe_s.a_dec)],
+            [float(pe_u.a_ra), float(pe_u.a_dec)],
+            [float(pe_n.a_ra), float(pe_n.a_dec)],
+            [float(pe_p.a_ra), float(pe_p.a_dec)]])
+
+def test_planet_coords():
+    separation_tolerance = 1*u.degree
+    time = Time("1980-08-13 00:00:00")
+    apo = get_site("APO")
+    ap_merc = mercury(time, apo)
+    ap_v = venus(time, apo)
+    ap_m = mars(time, apo)
+    ap_j = jupiter(time, apo)
+    ap_s = saturn(time, apo)
+    ap_u = uranus(time, apo)
+    ap_n = neptune(time, apo)
+    ap_p = pluto(time, apo)
+
+    get_ra_dec_list = lambda fixedtgt: [fixedtgt.ra.radian,
+                                        fixedtgt.dec.radian]
+
+    astroplan_coords_radians = list(map(get_ra_dec_list, [ap_merc, ap_v, ap_m,
+                                                          ap_j, ap_s, ap_u,
+                                                          ap_n, ap_p]))
+    # Calculate these coords with print_pyephem_planet_coords()
+    pyephem_coords_radians = [[2.2621934197955693, 0.33759276848151226],
+                              [1.672337996581023, 0.338442409078051],
+                              [3.4620617385136305, -0.1382275166770391],
+                              [2.896853311868943, 0.12429850509762044],
+                              [3.0853219164084273, 0.063953773789147],
+                              [4.005575325256486, -0.3138789902104957],
+                              [4.52950822189444, -0.3789041061785018],
+                              [3.571485523833843, 0.13743336907204634]]
+
+    assert_allclose(astroplan_coords_radians, pyephem_coords_radians,
+                    atol=separation_tolerance.to(u.rad).value)

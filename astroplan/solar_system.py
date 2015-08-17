@@ -2,23 +2,6 @@
 """
 Tools for interacting with jplephem to compute positions of solar system
 objects.
-
-DE430 key:
-    File type DAF/SPK and format LTL-IEEE with 14 segments:
-    Solar System Barycenter (0) -> Mercury Barycenter (1)
-    Solar System Barycenter (0) -> Venus Barycenter (2)
-    Solar System Barycenter (0) -> Earth Barycenter (3)
-    Solar System Barycenter (0) -> Mars Barycenter (4)
-    Solar System Barycenter (0) -> Jupiter Barycenter (5)
-    Solar System Barycenter (0) -> Saturn Barycenter (6)
-    Solar System Barycenter (0) -> Uranus Barycenter (7)
-    Solar System Barycenter (0) -> Neptune Barycenter (8)
-    Solar System Barycenter (0) -> Pluto Barycenter (9)
-    Solar System Barycenter (0) -> Sun (10)
-    Earth Barycenter (3) -> Moon (301)
-    Earth Barycenter (3) -> Earth (399)
-    Mercury Barycenter (1) -> Mercury (199)
-    Venus Barycenter (2) -> Venus (299)
 """
 
 from __future__ import (absolute_import, division, print_function,
@@ -35,7 +18,7 @@ from jplephem.spk import SPK
 __all__ = ["mercury", "venus", "mars", "jupiter", "saturn", "uranus", "neptune",
            "pluto"]
 
-def get_spk_file():
+def _get_spk_file():
     """
     Get the Satellite Planet Kernel (SPK) file `de430.bsp` from NASA JPL.
 
@@ -48,10 +31,26 @@ def get_spk_file():
                  'generic_kernels/spk/planets/de430.bsp')
     return download_file(de430_url, cache=True, show_progress=True)
 
-kernel = SPK.open(get_spk_file())
+kernel = SPK.open(_get_spk_file())
 
 def _get_cartesian_position(time, planet_index):
     """
+    Calculate the position of planet ``planet_index`` in cartesian coordinates.
+
+    Uses ``jplephem`` with the DE430 kernel.
+
+    Parameters
+    ----------
+    time : `~astropy.time.Time`
+        Time of observation
+
+    planet_index : int
+        Index of the planet (1-9 for Mercury through Pluto)
+
+    Returns
+    -------
+    cartesian_position : `~astropy.units.Quantity`
+        GRCS position of the planet in cartesian coordinates
     """
     if planet_index < 3:
         barycenter_to_planet_ind = planet_index*100 + 99
@@ -67,6 +66,20 @@ def _get_cartesian_position(time, planet_index):
 
 def _get_earth_distance(time, planet_index):
     """
+    Calculate the distance between Earth and planet ``planet_index``.
+
+    Parameters
+    ----------
+    time : `~astropy.time.Time`
+        Time of observation
+
+    planet_index : int
+        Index of the planet (1-9 for Mercury through Pluto)
+
+    Returns
+    -------
+    earth_distance : `~astropy.units.Quantity`
+        Distance between Earth and planet.
     """
     if planet_index < 3:
         barycenter_to_planet_ind = planet_index*100 + 99
@@ -86,6 +99,23 @@ def _get_earth_distance(time, planet_index):
 
 def _get_sky_coord(time, location, planet_index):
     """
+    Create a `~astropy.coordinates.SkyCoord` object for planet ``planet_index``.
+
+    Parameters
+    ----------
+    time : `~astropy.time.Time`
+        Time of observation
+
+    location : `~astropy.coordinates.EarthLocation`
+        Location of observer on the Earth.
+
+    planet_index : int
+        Index of the planet (1-9 for Mercury through Pluto)
+
+    Returns
+    -------
+    skycoord : `~astropy.coordinates.SkyCoord`
+        Coordinate for the planet
     """
     # Get distance of planet at `time`
     earth_distance = _get_earth_distance(time, planet_index)
@@ -99,33 +129,153 @@ def _get_sky_coord(time, location, planet_index):
                                         obsgeoloc=location))
 
 def mercury(time, location):
+    """
+    Position of the planet Mercury.
+
+    Parameters
+    ----------
+    time : `~astropy.time.Time`
+        Time of observation
+
+    location : `~astropy.coordinates.EarthLocation`
+        Location of observer on the Earth.
+
+    Returns
+    -------
+
+    """
     return FixedTarget(coord=_get_sky_coord(time, location, 1),
                        name="Mercury")
 
 def venus(time, location):
+    """
+    Position of the planet Venus.
+
+    Parameters
+    ----------
+    time : `~astropy.time.Time`
+        Time of observation
+
+    location : `~astropy.coordinates.EarthLocation`
+        Location of observer on the Earth.
+
+    Returns
+    -------
+
+    """
     return FixedTarget(coord=_get_sky_coord(time, location, 2),
                        name="Venus")
 
 def mars(time, location):
+    """
+    Position of the planet Mars.
+
+    Parameters
+    ----------
+    time : `~astropy.time.Time`
+        Time of observation
+
+    location : `~astropy.coordinates.EarthLocation`
+        Location of observer on the Earth.
+
+    Returns
+    -------
+
+    """
     return FixedTarget(coord=_get_sky_coord(time, location, 4),
                        name="Mars")
 
 def jupiter(time, location):
+    """
+    Position of the planet Jupiter.
+
+    Parameters
+    ----------
+    time : `~astropy.time.Time`
+        Time of observation
+
+    location : `~astropy.coordinates.EarthLocation`
+        Location of observer on the Earth.
+
+    Returns
+    -------
+
+    """
     return FixedTarget(coord=_get_sky_coord(time, location, 5),
                        name="Jupiter")
 
 def saturn(time, location):
+    """
+    Position of the planet Saturn.
+
+    Parameters
+    ----------
+    time : `~astropy.time.Time`
+        Time of observation
+
+    location : `~astropy.coordinates.EarthLocation`
+        Location of observer on the Earth.
+
+    Returns
+    -------
+
+    """
     return FixedTarget(coord=_get_sky_coord(time, location, 6),
                        name="Saturn")
 
 def uranus(time, location):
+    """
+    Position of the planet Uranus.
+
+    Parameters
+    ----------
+    time : `~astropy.time.Time`
+        Time of observation
+
+    location : `~astropy.coordinates.EarthLocation`
+        Location of observer on the Earth.
+
+    Returns
+    -------
+
+    """
     return FixedTarget(coord=_get_sky_coord(time, location, 7),
                        name="Uranus")
 
 def neptune(time, location):
+    """
+    Position of the planet Neptune.
+
+    Parameters
+    ----------
+    time : `~astropy.time.Time`
+        Time of observation
+
+    location : `~astropy.coordinates.EarthLocation`
+        Location of observer on the Earth.
+
+    Returns
+    -------
+
+    """
     return FixedTarget(coord=_get_sky_coord(time, location, 8),
                        name="Neptune")
 
 def pluto(time, location):
+    """
+    Position of the planet Pluto.
+
+    Parameters
+    ----------
+    time : `~astropy.time.Time`
+        Time of observation
+
+    location : `~astropy.coordinates.EarthLocation`
+        Location of observer on the Earth.
+
+    Returns
+    -------
+
+    """
     return FixedTarget(coord=_get_sky_coord(time, location, 9),
                        name="Pluto")
