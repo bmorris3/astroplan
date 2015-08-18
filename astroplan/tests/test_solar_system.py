@@ -57,21 +57,22 @@ def test_planet_coords():
     separation_tolerance = 1*u.degree
     time = Time("1980-08-13 00:00:00")
     apo = get_site("APO")
-    ap_merc = mercury(time, apo)
-    ap_v = venus(time, apo)
-    ap_m = mars(time, apo)
-    ap_j = jupiter(time, apo)
-    ap_s = saturn(time, apo)
-    ap_u = uranus(time, apo)
-    ap_n = neptune(time, apo)
-    ap_p = pluto(time, apo)
+    ap_merc = mercury(location=apo)
+    ap_v = venus(location=apo)
+    ap_m = mars(location=apo)
+    ap_j = jupiter(location=apo)
+    ap_s = saturn(location=apo)
+    ap_u = uranus(location=apo)
+    ap_n = neptune(location=apo)
+    ap_p = pluto(location=apo)
 
-    get_ra_dec_list = lambda fixedtgt: [fixedtgt.ra.radian,
-                                        fixedtgt.dec.radian]
+    get_ra_dec_list = lambda fixedtgt: [fixedtgt.at(time).ra.radian,
+                                        fixedtgt.at(time).dec.radian]
 
     astroplan_coords_radians = list(map(get_ra_dec_list, [ap_merc, ap_v, ap_m,
                                                           ap_j, ap_s, ap_u,
                                                           ap_n, ap_p]))
+
     # Calculate these coords with print_pyephem_planet_coords()
     pyephem_coords_radians = [[2.2621934197955693, 0.33759276848151226],
                               [1.672337996581023, 0.338442409078051],

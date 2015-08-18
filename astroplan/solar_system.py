@@ -134,10 +134,7 @@ def mercury(location=None):
 
     Parameters
     ----------
-    time : `~astropy.time.Time`
-        Time of observation
-
-    location : `~astropy.coordinates.EarthLocation`
+    location : `~astropy.coordinates.EarthLocation` (optional)
         Location of observer on the Earth.
 
     Returns
@@ -149,16 +146,13 @@ def mercury(location=None):
                           constant_kwargs=dict(location=location,
                                                planet_index=1))
 
-def venus(time, location):
+def venus(location=None):
     """
     Position of the planet Venus.
 
     Parameters
     ----------
-    time : `~astropy.time.Time`
-        Time of observation
-
-    location : `~astropy.coordinates.EarthLocation`
+    location : `~astropy.coordinates.EarthLocation`  (optional)
         Location of observer on the Earth.
 
     Returns
@@ -170,16 +164,13 @@ def venus(time, location):
                           constant_kwargs=dict(location=location,
                                                planet_index=2))
 
-def mars(time, location):
+def mars(location=None):
     """
     Position of the planet Mars.
 
     Parameters
     ----------
-    time : `~astropy.time.Time`
-        Time of observation
-
-    location : `~astropy.coordinates.EarthLocation`
+    location : `~astropy.coordinates.EarthLocation`  (optional)
         Location of observer on the Earth.
 
     Returns
@@ -191,16 +182,13 @@ def mars(time, location):
                           constant_kwargs=dict(location=location,
                                                planet_index=4))
 
-def jupiter(time, location):
+def jupiter(location=None):
     """
     Position of the planet Jupiter.
 
     Parameters
     ----------
-    time : `~astropy.time.Time`
-        Time of observation
-
-    location : `~astropy.coordinates.EarthLocation`
+    location : `~astropy.coordinates.EarthLocation`  (optional)
         Location of observer on the Earth.
 
     Returns
@@ -212,16 +200,13 @@ def jupiter(time, location):
                           constant_kwargs=dict(location=location,
                                                planet_index=5))
 
-def saturn(time, location):
+def saturn(location):
     """
     Position of the planet Saturn.
 
     Parameters
     ----------
-    time : `~astropy.time.Time`
-        Time of observation
-
-    location : `~astropy.coordinates.EarthLocation`
+    location : `~astropy.coordinates.EarthLocation`  (optional)
         Location of observer on the Earth.
 
     Returns
@@ -233,15 +218,12 @@ def saturn(time, location):
                           constant_kwargs=dict(location=location,
                                                planet_index=6))
 
-def uranus(time, location):
+def uranus(location=None):
     """
     Position of the planet Uranus.
 
     Parameters
     ----------
-    time : `~astropy.time.Time`
-        Time of observation
-
     location : `~astropy.coordinates.EarthLocation`
         Location of observer on the Earth.
 
@@ -254,16 +236,13 @@ def uranus(time, location):
                           constant_kwargs=dict(location=location,
                                                planet_index=7))
 
-def neptune(time, location):
+def neptune(location=None):
     """
     Position of the planet Neptune.
 
     Parameters
     ----------
-    time : `~astropy.time.Time`
-        Time of observation
-
-    location : `~astropy.coordinates.EarthLocation`
+    location : `~astropy.coordinates.EarthLocation`  (optional)
         Location of observer on the Earth.
 
     Returns
@@ -275,15 +254,12 @@ def neptune(time, location):
                           constant_kwargs=dict(location=location,
                                                planet_index=8))
 
-def pluto(time, location):
+def pluto(location=None):
     """
     Position of the planet Pluto.
 
     Parameters
     ----------
-    time : `~astropy.time.Time`
-        Time of observation
-
     location : `~astropy.coordinates.EarthLocation`
         Location of observer on the Earth.
 
