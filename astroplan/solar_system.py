@@ -9,11 +9,11 @@ from __future__ import (absolute_import, division, print_function,
 
 from astropy.coordinates import (SkyCoord, GCRS, CartesianRepresentation)
 import astropy.units as u
-from .core import FixedTarget
 from astropy.utils.data import download_file
 import numpy as np
 from astropy.constants import c as speed_of_light
 from jplephem.spk import SPK
+from .core import NonFixedTarget
 
 __all__ = ["mercury", "venus", "mars", "jupiter", "saturn", "uranus", "neptune",
            "pluto"]
@@ -128,7 +128,7 @@ def _get_sky_coord(time, location, planet_index):
     return SkyCoord(cartrep, frame=GCRS(obstime=time,
                                         obsgeoloc=location))
 
-def mercury(time, location):
+def mercury(location=None):
     """
     Position of the planet Mercury.
 
@@ -144,8 +144,10 @@ def mercury(time, location):
     -------
 
     """
-    return FixedTarget(coord=_get_sky_coord(time, location, 1),
-                       name="Mercury")
+    return NonFixedTarget(coord_function=_get_sky_coord,
+                          name="Mercury",
+                          constant_kwargs=dict(location=location,
+                                               planet_index=1))
 
 def venus(time, location):
     """
@@ -163,8 +165,10 @@ def venus(time, location):
     -------
 
     """
-    return FixedTarget(coord=_get_sky_coord(time, location, 2),
-                       name="Venus")
+    return NonFixedTarget(coord_function=_get_sky_coord,
+                          name="Venus",
+                          constant_kwargs=dict(location=location,
+                                               planet_index=2))
 
 def mars(time, location):
     """
@@ -182,8 +186,10 @@ def mars(time, location):
     -------
 
     """
-    return FixedTarget(coord=_get_sky_coord(time, location, 4),
-                       name="Mars")
+    return NonFixedTarget(coord_function=_get_sky_coord,
+                          name="Mars",
+                          constant_kwargs=dict(location=location,
+                                               planet_index=4))
 
 def jupiter(time, location):
     """
@@ -201,8 +207,10 @@ def jupiter(time, location):
     -------
 
     """
-    return FixedTarget(coord=_get_sky_coord(time, location, 5),
-                       name="Jupiter")
+    return NonFixedTarget(coord_function=_get_sky_coord,
+                          name="Jupiter",
+                          constant_kwargs=dict(location=location,
+                                               planet_index=5))
 
 def saturn(time, location):
     """
@@ -220,8 +228,10 @@ def saturn(time, location):
     -------
 
     """
-    return FixedTarget(coord=_get_sky_coord(time, location, 6),
-                       name="Saturn")
+    return NonFixedTarget(coord_function=_get_sky_coord,
+                          name="Saturn",
+                          constant_kwargs=dict(location=location,
+                                               planet_index=6))
 
 def uranus(time, location):
     """
@@ -239,8 +249,10 @@ def uranus(time, location):
     -------
 
     """
-    return FixedTarget(coord=_get_sky_coord(time, location, 7),
-                       name="Uranus")
+    return NonFixedTarget(coord_function=_get_sky_coord,
+                          name="Uranus",
+                          constant_kwargs=dict(location=location,
+                                               planet_index=7))
 
 def neptune(time, location):
     """
@@ -258,8 +270,10 @@ def neptune(time, location):
     -------
 
     """
-    return FixedTarget(coord=_get_sky_coord(time, location, 8),
-                       name="Neptune")
+    return NonFixedTarget(coord_function=_get_sky_coord,
+                          name="Neptune",
+                          constant_kwargs=dict(location=location,
+                                               planet_index=8))
 
 def pluto(time, location):
     """
@@ -277,5 +291,7 @@ def pluto(time, location):
     -------
 
     """
-    return FixedTarget(coord=_get_sky_coord(time, location, 9),
-                       name="Pluto")
+    return NonFixedTarget(coord_function=_get_sky_coord,
+                          name="Pluto",
+                          constant_kwargs=dict(location=location,
+                                               planet_index=9))
