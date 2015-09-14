@@ -10,12 +10,13 @@ G.W., et al. 2011, PASP, 123, 412  [1]_.
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
+import numpy as np
+
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 from astropy.time import Time
 from astropy.utils.data import download_file, clear_download_cache
 from astropy.constants import M_jup, M_sun, R_jup, R_sun
-import numpy as np
 from astropy.table import QTable
 
 __all__ = ["Exoplanets"]
@@ -73,10 +74,10 @@ exoplanet_table_units = dict(
     GAMMAUPPER=u.km/u.s,
     GAMMALOWER=u.km/u.s,
     UGAMMA=u.km/u.s,
-    GRAVITY=u.dex(u.cm/u.s**2),
-    GRAVITYUPPER=u.dex(u.cm/u.s**2),
-    GRAVITYLOWER=u.dex(u.cm/u.s**2),
-    UGRAVITY=u.dex(u.cm/u.s**2),
+    # GRAVITY=u.dex(u.cm/u.s**2),
+    # GRAVITYUPPER=u.dex(u.cm/u.s**2),
+    # GRAVITYLOWER=u.dex(u.cm/u.s**2),
+    # UGRAVITY=u.dex(u.cm/u.s**2),
     H=u.mag,
     I=u.deg,
     IUPPER=u.deg,
@@ -344,7 +345,7 @@ class Exoplanets(object):
         idx = self.get_planet_index(planet)
         return self.tbl['SkyCoord'][idx]
 
-    def get_transits(self, planet, time_start, time_end):
+    def get_midtransit_times(self, planet, time_start, time_end):
         """
         Get mid-transit times of ``planet`` between ``time_start`` and
         ``time_end``.
@@ -377,6 +378,24 @@ class Exoplanets(object):
             return Time(np.arange(start, end+1, dtype=int)*period + epoch)
         else:
             return None
+
+    def get_transit_duration(self, planet):
+        """
+        Get transit duration between first and fourth contact.
+
+        Parameters
+        ----------
+        planet : string
+            Name of exoplanet
+
+        Returns
+        -------
+        duration : `~astropy.units.Quantity`
+            Duration of transit
+        """
+        idx = self.get_planet_index(planet)
+        duration = self.tbl['T14'][idx]
+        return duration
 
     @u.quantity_input(horizon=u.deg, solar_horizon=u.deg)
     def is_transit_visible(self, observer, planet, mid_transit_time,
@@ -465,7 +484,7 @@ class Exoplanets(object):
         times : `~astropy.time.Time` or None
             Times of transits visible to ``observer``
         """
-        all_transits = self.get_transits(planet, start_time, end_time)
+        all_transits = self.get_midtransit_times(planet, start_time, end_time)
         is_transit_visible_kwargs = dict(planet_horizon=planet_horizon,
                                          solar_horizon=solar_horizon,
                                          full_transit=full_transit)

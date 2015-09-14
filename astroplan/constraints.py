@@ -23,12 +23,13 @@ import numpy as np
 from .moon import get_moon, moon_illumination
 from .utils import time_grid_from_range
 from .target import FixedTarget
+from .exoplanets import Exoplanets
 
 __all__ = ["AltitudeConstraint", "AirmassConstraint", "AtNightConstraint",
            "is_observable", "is_always_observable", "time_grid_from_range",
            "SunSeparationConstraint", "MoonSeparationConstraint",
            "MoonIlluminationConstraint", "LocalTimeConstraint", "Constraint",
-           "observability_table"]
+           "observability_table", "ExoplanetInTransitConstraint"]
 
 
 def _get_altaz(times, observer, targets,
@@ -635,3 +636,49 @@ def observability_table(constraints, observer, targets, times=None,
     tab.meta['constraints'] = constraints
 
     return tab
+
+class ExoplanetInTransitConstraint(Constraint):
+    """
+    Constraint observations to times during a transit of an exoplanet
+    """
+    def __init__(self, planet_name, buffer_time=0*u.hour, exoplanets=None):
+        """
+        Parameters
+        ----------
+        planet_name : string
+            Name of planet in the exoplanets.org database.
+
+        buffer_time : `~astropy.units.Quantity`
+            Add ``buffer_time`` worth of extra time before ingress/after egress
+            to consider the target to be in-transit, useful for planning for
+            baseline measurements before and after transit.
+
+        exoplanets : `None`, `~astropy.exoplanets.Exoplanets`
+            Exoplanet database object
+        """
+        if exoplanets is None:
+            exoplanets = Exoplanets(transiting=True)
+        self.exoplanets = exoplanets
+        self.planet = planet_name
+        self.buffer_time = buffer_time
+
+        if planet_name not in exoplanets.get_available_planets():
+            raise ValueError("'{}' not available in this exoplanet database."
+                             .format(planet_name))
+
+    def compute_constraint(self, times, observer, targets):
+        midtransit_times = self.exoplanets.get_midtransit_times(self.planet,
+                                                                min(times),
+                                                                max(times))
+        if midtransit_times is not None:
+            times_jd = times.jd[:, np.newaxis]
+            in_transit_half_duration = self.exoplanets.get_transit_duration(self.planet)/2.0
+            time_to_nearest_transit = np.min(np.abs(times_jd - midtransit_times.jd),
+                                             axis=1)
+
+            mask = [(time_to_nearest_transit*u.day < self.buffer_time +
+                    in_transit_half_duration)]
+        else:
+            mask = [np.zeros_like(times).astype(bool)]
+
+        return mask
