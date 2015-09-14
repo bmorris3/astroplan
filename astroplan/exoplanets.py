@@ -17,7 +17,6 @@ from astropy.utils.data import download_file, clear_download_cache
 from astropy.constants import M_jup, M_sun, R_jup, R_sun
 import numpy as np
 from astropy.table import QTable
-from .cache import pickle_exists, pickle_data, unpickle_data
 
 __all__ = ["Exoplanets"]
 

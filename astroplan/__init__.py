@@ -28,6 +28,5 @@ if not _ASTROPY_SETUP_:
     from .moon import *
     from .constraints import *
     from .exoplanets import *
-    from .cache import *
 
     get_IERS_A_or_workaround()
