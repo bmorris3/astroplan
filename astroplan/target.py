@@ -8,8 +8,9 @@ from abc import ABCMeta
 # Third-party
 import astropy.units as u
 from astropy.coordinates import SkyCoord
+from astropy.time import Time
 
-__all__ = ["Target", "FixedTarget", "NonFixedTarget"]
+__all__ = ["Target", "FixedTarget", "NonFixedTarget", "SecondaryBody"]
 
 class Target(object):
     """
@@ -80,7 +81,7 @@ class FixedTarget(Target):
     >>> from astroplan import FixedTarget
     >>> sirius = FixedTarget.from_name("Sirius")
     """
-    def __init__(self, coord, name=None, **kwargs):
+    def __init__(self, coord, name=None, secondaries=None, **kwargs):
         """
         Parameters
         ----------
@@ -90,6 +91,9 @@ class FixedTarget(Target):
         name : str (optional)
             Name of the target, used for plotting and representing the target
             as a string
+
+        secondaries : list or `None` (optional)
+            List of `~astroplan.SecondaryBody` objects that orbit the target
         """
         if not (hasattr(coord, 'transform_to') and
                 hasattr(coord, 'represent_as')):
@@ -97,6 +101,9 @@ class FixedTarget(Target):
 
         self.name = name
         self.coord = coord
+        if not hasattr(secondaries, '__len__') and secondaries is not None:
+            secondaries = [secondaries]
+        self.secondaries = secondaries
 
     @classmethod
     def from_name(cls, query_name, name=None, **kwargs):
@@ -167,6 +174,200 @@ class FixedTarget(Target):
         else:
             raise ValueError("Target named {} not in mocked FixedTarget "
                              "method".format(query_name))
+
+class SecondaryBody(object):
+    """
+    A body that orbits another body.
+    """
+    def __init__(self, name=None, period=None, time_inferior_conjunction=None,
+                 eclipse_duration=None):
+        """
+        Parameters
+        ----------
+        name : str (optional)
+            Name of the target, used for plotting and representing the target
+            as a string
+
+        time_inferior_conjunction : `~astropy.time.Time`
+            Time at inferior conjunction (i.e. in eclipsing systems: the time
+            of inferior conjunction is the time at the middle of primary
+            eclipse)
+
+        period : `~astropy.units.Quantity`
+            Orbital period of the secondary
+
+        eclipse_duration : `~astropy.units.Quantity` (optional)
+            Duration of eclipse, if this secondary body eclipses the primary.
+        """
+        self.name = name
+        self.period = period
+        self.eclipse_duration = eclipse_duration
+        self.time_inferior_conjunction = time_inferior_conjunction
+
+    def inferior_conjunction_time(self, time, which='nearest'):
+        """
+        Time at inferior conjunction.
+
+        Parameters
+        ----------
+        time : `~astropy.time.Time` or other (see below)
+            Time of observations. This will be passed in as the first argument to
+            the `~astropy.time.Time` initializer, so it can be anything that
+            `~astropy.time.Time` will accept (including a `~astropy.time.Time`
+            object).
+
+        which : {'next', 'previous', 'nearest'}
+            Choose which mid-eclipse relative to the present ``time`` would you
+            like to calculate. Default is nearest.
+        Returns
+        -------
+        `~astropy.time.Time`
+            Time of inferior conjunction
+        """
+        if not isinstance(time, Time):
+            time = Time(time)
+
+        phase_at_time = (abs(time - self.time_inferior_conjunction).to(u.day) %
+                         self.period)
+        next_eclipse = time + (self.period - phase_at_time)
+        previous_eclipse = time - phase_at_time
+
+        if which == 'next':
+            return next_eclipse
+        elif which == 'previous':
+            return previous_eclipse
+        elif which == 'nearest':
+            if abs(next_eclipse - time) < abs(previous_eclipse - time):
+                return next_eclipse
+            else:
+                return previous_eclipse
+        else:
+            raise ValueError('"which" kwarg must be "next", "previous" or '
+                             '"nearest".')
+
+    def ingress_time(self, time, which='nearest'):
+        """
+        Ingress time.
+
+        Assumes that the difference between time of ingress and the time of
+        mid-eclipse is equivalent to the difference between the time of egress
+        to the time of egress (i.e. strictly true for circular orbits only).
+
+        Parameters
+        ----------
+        time : `~astropy.time.Time` or other (see below)
+            Time of observations. This will be passed in as the first argument to
+            the `~astropy.time.Time` initializer, so it can be anything that
+            `~astropy.time.Time` will accept (including a `~astropy.time.Time`
+            object).
+
+        which : {'next', 'previous', 'nearest'}
+            Choose which ingress relative to the present ``time`` would you
+            like to calculate. Default is nearest.
+
+        Returns
+        -------
+        `~astropy.time.Time`
+            Time of ingress
+        """
+        if self.eclipse_duration is None:
+            raise ValueError("An eclipse duration is required to compute "
+                             "ingress times.")
+
+        if not isinstance(time, Time):
+            time = Time(time)
+
+        phase_at_time = (abs(time - self.time_inferior_conjunction).to(u.day) %
+                         self.period)
+        next_ingress = time + (self.period - phase_at_time) - 0.5*self.eclipse_duration
+        previous_ingress = time - phase_at_time - 0.5*self.eclipse_duration
+
+        if which == 'next':
+            return next_ingress
+        elif which == 'previous':
+            return previous_ingress
+        elif which == 'nearest':
+            if abs(next_ingress - time) < abs(previous_ingress - time):
+                return next_ingress
+            else:
+                return previous_ingress
+        else:
+            raise ValueError('"which" kwarg must be "next", "previous" or '
+                             '"nearest".')
+
+    def egress_time(self, time, which='nearest'):
+        """
+        Egress time.
+
+        Assumes that the difference between time of ingress and the time of
+        mid-eclipse is equivalent to the difference between the time of egress
+        to the time of egress (i.e. strictly true for circular orbits only).
+
+        Parameters
+        ----------
+        time : `~astropy.time.Time` or other (see below)
+            Time of observations. This will be passed in as the first argument to
+            the `~astropy.time.Time` initializer, so it can be anything that
+            `~astropy.time.Time` will accept (including a `~astropy.time.Time`
+            object).
+
+        which : {'next', 'previous', 'nearest'}
+            Choose which egress relative to the present ``time`` would you
+            like to calculate. Default is nearest.
+
+        Returns
+        -------
+        `~astropy.time.Time`
+            Time of egress
+        """
+        if self.eclipse_duration is None:
+            raise ValueError("An eclipse duration is required to compute "
+                             "egress times.")
+
+        if not isinstance(time, Time):
+            time = Time(time)
+
+        phase_at_time = (abs(time - self.time_inferior_conjunction).to(u.day) %
+                         self.period)
+        next_egress = time + (self.period - phase_at_time) + 0.5*self.eclipse_duration
+        previous_egress = time - phase_at_time + 0.5*self.eclipse_duration
+
+        if which == 'next':
+            return next_egress
+        elif which == 'previous':
+            return previous_egress
+        elif which == 'nearest':
+            if abs(next_egress - time) < abs(previous_egress - time):
+                return next_egress
+            else:
+                return previous_egress
+        else:
+            raise ValueError('"which" kwarg must be "next", "previous" or '
+                             '"nearest".')
+
+    def phase(self, time):
+        """
+        Orbital phase of secondary on [0, 1].
+
+        Parameters
+        ----------
+        time : `~astropy.time.Time` or other (see below)
+            Time(s) of observations. This will be passed in as the first
+            argument to the `~astropy.time.Time` initializer, so it can be
+            anything that `~astropy.time.Time` will accept (including a
+            `~astropy.time.Time` object).
+
+        Returns
+        -------
+        orbital_phase : float or array
+            Orbital phase of secondary at ``times``.
+        """
+        if not isinstance(time, Time):
+            time = Time(time)
+
+        orbital_phase = (abs(time - self.time_inferior_conjunction).to(u.day) /
+                         self.period) % 1
+        return orbital_phase
 
 class NonFixedTarget(Target):
     """

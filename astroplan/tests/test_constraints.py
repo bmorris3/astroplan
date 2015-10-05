@@ -10,12 +10,13 @@ from astropy.coordinates import SkyCoord, get_sun
 
 from ..moon import get_moon
 from ..observer import Observer
-from ..target import FixedTarget
+from ..target import FixedTarget, SecondaryBody
 from ..constraints import (AltitudeConstraint, AirmassConstraint, AtNightConstraint,
                            is_observable, is_always_observable, observability_table,
                            time_grid_from_range, SunSeparationConstraint,
                            MoonSeparationConstraint, MoonIlluminationConstraint,
-                           LocalTimeConstraint)
+                           LocalTimeConstraint, PrimaryEclipseConstraint,
+                           SecondaryPhaseConstraint, SecondaryEclipseConstraint)
 
 try:
     import ephem
@@ -188,15 +189,15 @@ def test_moon_illumination():
     # [ 0.99946328  0.46867661  0.05379006]
 
     constraint = MoonIlluminationConstraint(min=0.2, max=0.8)
-    is_constraint_met = [constraint(lco, None, times=time) for time in times]
+    is_constraint_met = [constraint(lco, vega, times=time) for time in times]
     assert np.all(is_constraint_met == [False, True, False])
 
     constraint = MoonIlluminationConstraint(min=0.2)
-    is_constraint_met = [constraint(lco, None, times=time) for time in times]
+    is_constraint_met = [constraint(lco, vega, times=time) for time in times]
     assert np.all(is_constraint_met == [True, True, False])
 
     constraint = MoonIlluminationConstraint(max=0.8)
-    is_constraint_met = [constraint(lco, None, times=time) for time in times]
+    is_constraint_met = [constraint(lco, vega, times=time) for time in times]
     assert np.all(is_constraint_met == [False, True, True])
 
 
@@ -204,15 +205,15 @@ def test_local_time_constraint_utc():
     time = Time('2001-02-03 04:05:06')
     subaru = Observer.at_site("Subaru")
     constraint = LocalTimeConstraint(min=dt.time(23,50), max=dt.time(4,8))
-    is_constraint_met = constraint(subaru, None, times=time)
+    is_constraint_met = constraint(subaru, vega, times=time)
     assert is_constraint_met == [True]
 
     constraint = LocalTimeConstraint(min=dt.time(0,2), max=dt.time(4,3))
-    is_constraint_met = constraint(subaru, None, times=time)
+    is_constraint_met = constraint(subaru, vega, times=time)
     assert is_constraint_met == [False]
 
     constraint = LocalTimeConstraint(min=dt.time(3,8), max=dt.time(5,35))
-    is_constraint_met = constraint(subaru, None, times=time)
+    is_constraint_met = constraint(subaru, vega, times=time)
     assert is_constraint_met == [True]
 
 
@@ -221,15 +222,15 @@ def test_local_time_constraint_hawaii_tz():
     time = Time('2001-02-03 04:05:06')
     subaru = Observer.at_site("Subaru", timezone="US/Hawaii")
     constraint = LocalTimeConstraint(min=dt.time(23,50), max=dt.time(4,8))
-    is_constraint_met = constraint(subaru, None, times=time)
+    is_constraint_met = constraint(subaru, vega, times=time)
     assert is_constraint_met == [True]
 
     constraint = LocalTimeConstraint(min=dt.time(0,2), max=dt.time(4,3))
-    is_constraint_met = constraint(subaru, None, times=time)
+    is_constraint_met = constraint(subaru, vega, times=time)
     assert is_constraint_met == [False]
 
     constraint = LocalTimeConstraint(min=dt.time(3,8), max=dt.time(5,35))
-    is_constraint_met = constraint(subaru, None, times=time)
+    is_constraint_met = constraint(subaru, vega, times=time)
     assert is_constraint_met == [True]
 
 
@@ -314,3 +315,81 @@ def test_docs_example():
                                   time_range=time_range)
 
     assert all(observability == [False, False, True, False, False, False])
+
+
+def test_primary_eclipse_constraint():
+    # Source: http://exoplanets.org/detail/HD_189733_b
+    coord = SkyCoord(ra=300.18213945*u.deg, dec=22.71085126*u.deg, frame='icrs')
+    epoch = Time(2454279.436714, format='jd')
+    period = 2.21857567*u.day
+    duration = 0.0760*u.day
+
+    hd189b = SecondaryBody(name='HD 189733 b', time_inferior_conjunction=epoch,
+                           period=period, eclipse_duration=duration)
+    hd189 = FixedTarget(coord=coord, name='HD 189733 b', secondaries=hd189b)
+
+    obs = Observer.at_site("APO")
+    targets = hd189
+    time_range1 = Time(['2015-09-30 00:00', '2015-10-01 06:00'])
+    time_range2 = Time(['2015-09-30 00:00', '2015-10-01 02:00'])
+    constraints = PrimaryEclipseConstraint()
+
+    is_in_transit_in_range = is_observable(constraints, obs, targets,
+                                           time_range=time_range1)
+    not_in_transit = is_observable(constraints, obs, targets,
+                                   time_range=time_range2)
+
+    assert np.any(is_in_transit_in_range)
+    assert not np.any(not_in_transit)
+
+
+def test_secondary_eclipse_constraint():
+    # Source: http://exoplanets.org/detail/HD_189733_b
+    coord = SkyCoord(ra=300.18213945*u.deg, dec=22.71085126*u.deg, frame='icrs')
+    epoch = Time(2454279.436714, format='jd')
+    period = 2.21857567*u.day
+    duration = 0.0760*u.day
+
+    hd189b = SecondaryBody(name='HD 189733 b', time_inferior_conjunction=epoch,
+                           period=period, eclipse_duration=duration)
+    hd189 = FixedTarget(coord=coord, name='HD 189733 b', secondaries=hd189b)
+
+    obs = Observer.at_site("APO")
+    targets = hd189
+    time_range1 = Time(['2015-09-30 00:00', '2015-10-01 06:00']) + 0.5*period
+    time_range2 = Time(['2015-09-30 00:00', '2015-10-01 02:00']) + 0.5*period
+    constraints = SecondaryEclipseConstraint()
+
+    is_in_transit_in_range = is_observable(constraints, obs, targets,
+                                           time_range=time_range1)
+    not_in_transit = is_observable(constraints, obs, targets,
+                                   time_range=time_range2)
+
+    assert np.any(is_in_transit_in_range)
+    assert not np.any(not_in_transit)
+
+
+def test_secondary_phase_constraint():
+    # Source: http://exoplanets.org/detail/HD_189733_b
+    coord = SkyCoord(ra=300.18213945*u.deg, dec=22.71085126*u.deg, frame='icrs')
+    epoch = Time(2454279.436714, format='jd')
+    period = 2.21857567*u.day
+    duration = 0.0760*u.day
+
+    hd189b = SecondaryBody(name='HD 189733 b', time_inferior_conjunction=epoch,
+                           period=period, eclipse_duration=duration)
+    hd189 = FixedTarget(coord=coord, name='HD 189733 b', secondaries=hd189b)
+
+    obs = Observer.at_site("APO")
+    targets = hd189
+    time_range = Time(['2015-09-30 00:00', '2015-10-01 06:00'])
+
+    primary_eclipse_constraint = is_observable(PrimaryEclipseConstraint(), obs,
+                                               targets, time_range=time_range)
+
+    duration_in_phase = duration/period
+    phase_constraint = SecondaryPhaseConstraint(min=(1-0.5*duration_in_phase),
+                                                max=0.5*duration_in_phase)
+    secondary_phase_constraint = is_observable(phase_constraint, obs,
+                                               targets, time_range=time_range)
+    assert all(primary_eclipse_constraint == secondary_phase_constraint)

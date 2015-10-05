@@ -22,13 +22,14 @@ import numpy as np
 # Package
 from .moon import get_moon, moon_illumination
 from .utils import time_grid_from_range
-from .target import FixedTarget
+from .target import FixedTarget, Target
 
 __all__ = ["AltitudeConstraint", "AirmassConstraint", "AtNightConstraint",
            "is_observable", "is_always_observable", "time_grid_from_range",
            "SunSeparationConstraint", "MoonSeparationConstraint",
            "MoonIlluminationConstraint", "LocalTimeConstraint", "Constraint",
-           "observability_table"]
+           "observability_table", "PrimaryEclipseConstraint",
+           "SecondaryPhaseConstraint", "SecondaryEclipseConstraint"]
 
 
 def _get_altaz(times, observer, targets,
@@ -106,8 +107,10 @@ class Constraint(object):
             targets = [FixedTarget(coord=target) if isinstance(target, SkyCoord)
                        else target for target in targets]
         else:
-            if isinstance(targets, SkyCoord):
-                targets = FixedTarget(coord=targets)
+            if not isinstance(targets, Target):
+                targets = [FixedTarget(coord=targets)]
+            else:
+                targets = [targets]
 
         cons = self.compute_constraint(times, observer, targets)
         return cons
@@ -466,6 +469,106 @@ class LocalTimeConstraint(Constraint):
             mask = [(t.datetime.time() > min_time) or
                     (t.datetime.time() < max_time) for t in times]
 
+        return mask
+
+class PrimaryEclipseConstraint(Constraint):
+    """
+    Constrain observations to times during primary eclipses by
+    `~astroplan.SecondaryBody` objects
+    """
+    def __init__(self, buffer_duration=None):
+        """
+        Parameters
+        ----------
+        buffer_duration : `~astropy.units.Quantity`
+            Extra time before and after the event to require that the target
+            is observable. Defaults to zero.
+        """
+        if buffer_duration is None:
+            buffer_duration = 0*u.min
+        self.buffer_duration = buffer_duration
+
+    def compute_constraint(self, times, observer, targets):
+        mask = np.ones((len(times), len(targets)), dtype=bool)
+
+        for i, target in enumerate(targets):
+            if target.secondaries is not None:
+                for secondary in target.secondaries:
+                    phase = (abs(times - secondary.time_inferior_conjunction).to(u.day) %
+                             secondary.period)
+                    mask[:, i] = ((phase <= 0.5*(secondary.eclipse_duration +
+                                                  self.buffer_duration)) |
+                                   (phase >= secondary.period - 0.5*(secondary.eclipse_duration +
+                                                                  self.buffer_duration)))
+        return mask
+
+class SecondaryEclipseConstraint(Constraint):
+    """
+    Constrain observations to times during secondary eclipses by
+    `~astroplan.SecondaryBody` objects
+    """
+    def __init__(self, buffer_duration=None):
+        """
+        Parameters
+        ----------
+        buffer_duration : `~astropy.units.Quantity`
+            Extra time before and after the event to require that the target
+            is observable. Defaults to zero.
+        """
+        if buffer_duration is None:
+            buffer_duration = 0*u.min
+        self.buffer_duration = buffer_duration
+
+    def compute_constraint(self, times, observer, targets):
+        mask = np.ones((len(times), len(targets)), dtype=bool)
+
+        for i, target in enumerate(targets):
+            if target.secondaries is not None:
+                for secondary in target.secondaries:
+                    phase = (abs(times - secondary.time_inferior_conjunction + secondary.period/2).to(u.day) %
+                             secondary.period)
+                    mask[:, i] = ((phase <= 0.5*(secondary.eclipse_duration +
+                                                  self.buffer_duration)) |
+                                   (phase >= secondary.period - 0.5*(secondary.eclipse_duration +
+                                                                  self.buffer_duration)))
+        return mask
+
+class SecondaryPhaseConstraint(Constraint):
+    """
+    Constraint observations to a range of orbital phases of secondary bodies.
+    """
+    def __init__(self, min=None, max=None):
+        """
+        Parameters
+        ----------
+        min : float or `None` (optional)
+            Minimum acceptable orbital phase. `None` indicates no limit.
+        max : float or `None` (optional)
+            Maximum acceptable orbital phase. `None` indicates no limit.
+        """
+        self.min = min
+        self.max = max
+
+    def compute_constraint(self, times, observer, targets):
+        mask = np.ones((len(times), len(targets)), dtype=bool)
+
+        for i, target in enumerate(targets):
+            if target.secondaries is not None:
+                for secondary in target.secondaries:
+                    orbital_phase = secondary.phase(times)
+                    print(orbital_phase)
+                    if self.min is None and self.max is not None:
+                        mask[:, i] = self.max > orbital_phase
+                    elif self.max is None and self.min is not None:
+                        mask[:, i] = self.min < orbital_phase
+                    elif (self.min is not None and self.max is not None and
+                          self.min < self.max):
+                        mask[:, i] = ((self.min < orbital_phase) &
+                                (self.max > orbital_phase))
+                    elif (self.min is not None and self.max is not None and
+                          self.min > self.max):
+                        mask[:, i] = ((self.min < orbital_phase) |
+                                (self.max > orbital_phase))
         return mask
 
 
