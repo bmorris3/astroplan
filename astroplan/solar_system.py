@@ -18,6 +18,7 @@ from jplephem.spk import SPK
 __all__ = ["mercury", "venus", "mars", "jupiter", "saturn", "uranus", "neptune",
            "pluto"]
 
+
 def _get_spk_file():
     """
     Get the Satellite Planet Kernel (SPK) file `de430.bsp` from NASA JPL.
@@ -33,7 +34,8 @@ def _get_spk_file():
 
 kernel = SPK.open(_get_spk_file())
 
-def _get_cartesian_position(time, planet_index):
+
+def _get_absolute_planet_position(time, planet_index):
     """
     Calculate the position of planet ``planet_index`` in cartesian coordinates.
 
@@ -51,22 +53,41 @@ def _get_cartesian_position(time, planet_index):
     -------
     cartesian_position : `~astropy.units.Quantity`
         GRCS position of the planet in cartesian coordinates
+
+    earth_distance : `~astropy.units.Quantity`
+        Distance between Earth and planet.
+    Notes
+    -----
+
     """
     if planet_index < 3:
         barycenter_to_planet_ind = planet_index*100 + 99
-        cartesian_position = (kernel[0,planet_index].compute(time.jd) +
-                              kernel[planet_index,barycenter_to_planet_ind].compute(time.jd) -
-                              kernel[0,3].compute(time.jd) -
-                              kernel[3,399].compute(time.jd))
+        cartesian_position_planet = (kernel[0, planet_index].compute(time.jd) +
+                                     kernel[planet_index,
+                                            barycenter_to_planet_ind].compute(time.jd))
     else:
-        cartesian_position = (kernel[0,planet_index].compute(time.jd) -
-                              kernel[0,3].compute(time.jd) -
-                              kernel[3,399].compute(time.jd))
-    return cartesian_position*u.km
+        cartesian_position_planet = kernel[0, planet_index].compute(time.jd)
 
-def _get_earth_distance(time, planet_index):
+    cartesian_position_earth = (kernel[0, 3].compute(time.jd) +
+                                kernel[3, 399].compute(time.jd))
+
+    # Quadrature sum of the difference of the position vectors
+    earth_distance = np.sqrt(np.sum((np.array(cartesian_position_planet) -
+                                     np.array(cartesian_position_earth))**2))*u.km
+
+    earth_to_planet_vector = u.Quantity(kernel[0, planet_index].compute(time.jd) -
+                                        cartesian_position_earth,
+                                        unit=u.km)
+
+    return earth_to_planet_vector, earth_distance
+
+
+def _get_apparent_planet_position(time, planet_index):
     """
-    Calculate the distance between Earth and planet ``planet_index``.
+    Calculate the apparent position of planet ``planet_index`` in cartesian
+    coordinates, given the approximate light travel time to the object.
+
+    Uses ``jplephem`` with the DE430 kernel.
 
     Parameters
     ----------
@@ -78,24 +99,27 @@ def _get_earth_distance(time, planet_index):
 
     Returns
     -------
-    earth_distance : `~astropy.units.Quantity`
-        Distance between Earth and planet.
+    cartesian_position : `~astropy.coordinates.CartesianRepresentation`
+        Position of the planet defined as a vector from the Earth.
+
+    Notes
+    -----
+
     """
-    if planet_index < 3:
-        barycenter_to_planet_ind = planet_index*100 + 99
-        cartesian_position_planet = (kernel[0,planet_index].compute(time.jd) +
-                                     kernel[planet_index,barycenter_to_planet_ind].compute(time.jd))
-    else:
-        cartesian_position_planet = kernel[0,planet_index].compute(time.jd)
+    # Get distance of planet at `time`
+    earth_to_planet_vector, earth_distance = _get_absolute_planet_position(time, planet_index)
 
-    cartesian_position_earth = (kernel[0,3].compute(time.jd) +
-                                kernel[3,399].compute(time.jd))
+    # The apparent position depends on the time that the light was emitted from
+    # the distant planet, so subtract off the light travel time
+    light_travel_time = earth_distance/speed_of_light
+    emitted_time = time - light_travel_time
 
-    # Quadrature sum of the difference of the position vectors
-    earth_distance = np.sqrt(np.sum((np.array(cartesian_position_planet) -
-                                     np.array(cartesian_position_earth))**2))*u.km
+    # Calculate position given approximate light travel time.
+    # TODO: this should be solved iteratively to converge on precise positions
+    earth_to_planet_vector, earth_distance = _get_absolute_planet_position(emitted_time, planet_index)
+    x, y, z = earth_to_planet_vector
+    return CartesianRepresentation(x=x, y=y, z=z)
 
-    return earth_distance
 
 def _get_sky_coord(time, location, planet_index):
     """
@@ -117,16 +141,11 @@ def _get_sky_coord(time, location, planet_index):
     skycoord : `~astropy.coordinates.SkyCoord`
         Coordinate for the planet
     """
-    # Get distance of planet at `time`
-    earth_distance = _get_earth_distance(time, planet_index)
-    light_travel_time = earth_distance/speed_of_light
-    emitted_time = time - light_travel_time
+    cartrep = _get_apparent_planet_position(time, planet_index)
 
-    # Calculate position given approximate light travel time
-    x, y, z = _get_cartesian_position(emitted_time, planet_index)
-    cartrep = CartesianRepresentation(x=x, y=y, z=z)
-    return SkyCoord(cartrep, frame=GCRS(obstime=time,
-                                        obsgeoloc=location))
+    return SkyCoord(GCRS(cartrep, obstime=time,
+                         obsgeoloc=u.Quantity(location.geocentric, copy=False)))
+
 
 def mercury(time, location):
     """
@@ -147,6 +166,7 @@ def mercury(time, location):
     return FixedTarget(coord=_get_sky_coord(time, location, 1),
                        name="Mercury")
 
+
 def venus(time, location):
     """
     Position of the planet Venus.
@@ -165,6 +185,7 @@ def venus(time, location):
     """
     return FixedTarget(coord=_get_sky_coord(time, location, 2),
                        name="Venus")
+
 
 def mars(time, location):
     """
@@ -185,6 +206,7 @@ def mars(time, location):
     return FixedTarget(coord=_get_sky_coord(time, location, 4),
                        name="Mars")
 
+
 def jupiter(time, location):
     """
     Position of the planet Jupiter.
@@ -203,6 +225,7 @@ def jupiter(time, location):
     """
     return FixedTarget(coord=_get_sky_coord(time, location, 5),
                        name="Jupiter")
+
 
 def saturn(time, location):
     """
@@ -223,6 +246,7 @@ def saturn(time, location):
     return FixedTarget(coord=_get_sky_coord(time, location, 6),
                        name="Saturn")
 
+
 def uranus(time, location):
     """
     Position of the planet Uranus.
@@ -242,6 +266,7 @@ def uranus(time, location):
     return FixedTarget(coord=_get_sky_coord(time, location, 7),
                        name="Uranus")
 
+
 def neptune(time, location):
     """
     Position of the planet Neptune.
@@ -260,6 +285,7 @@ def neptune(time, location):
     """
     return FixedTarget(coord=_get_sky_coord(time, location, 8),
                        name="Neptune")
+
 
 def pluto(time, location):
     """

@@ -54,7 +54,7 @@ def print_pyephem_planet_coords():
             [float(pe_p.a_ra), float(pe_p.a_dec)]])
 
 def test_planet_coords():
-    separation_tolerance = 1*u.degree
+    separation_tolerance = 30*u.arcsec  #1*u.degree
     time = Time("1980-08-13 00:00:00")
     apo = get_site("APO")
     ap_merc = mercury(time, apo)
