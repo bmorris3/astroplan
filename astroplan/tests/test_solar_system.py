@@ -1,8 +1,8 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from astroplan.solar_system import (mercury, venus, mars, jupiter, saturn,
-                                    uranus, neptune, pluto)
+from astroplan.solarsystem import (mercury, venus, mars, jupiter, saturn,
+                                   uranus, neptune, pluto)
 from astropy.time import Time
 from astroplan import get_site
 import astropy.units as u
