@@ -282,6 +282,7 @@ def plot_airmass(targets, observer, time, ax=None, style_kwargs=None,
     # Output.
     return ax
 
+
 def plot_schedule_airmass(schedule, show_night=False):
     """
     Plots when observations of targets are scheduled to occur superimposed
