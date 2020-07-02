@@ -1,7 +1,8 @@
 0.7 (unreleased)
 ----------------
 
-- No changes yet
+- Add better handling of ``target_rise_time`` when used with the keyword
+  ``which=nearest`` for targets which never rise [#460]
 
 
 0.6 (2019-10-08)

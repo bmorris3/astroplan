@@ -923,7 +923,12 @@ class Observer(object):
                 return previous_event
 
         if which == 'nearest':
+            if (hasattr(previous_event.jd, 'mask') and
+                    hasattr(next_event.jd, 'mask')):
+                return Time(np.ma.masked_array([0], [True]), format='jd')
+
             mask = abs(time - previous_event) < abs(time - next_event)
+
             return Time(np.where(mask, previous_event.utc.jd,
                                  next_event.utc.jd), format='jd')
 

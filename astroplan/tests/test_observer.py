@@ -768,6 +768,19 @@ def test_solar_transit():
     assert astroplan_nearest_antitransit == astroplan_prev_antitransit
 
 
+def test_target_never_rise(recwarn):
+    lat = '40:00:00'
+    lon = '00:00:00'
+    elevation = 0.0 * u.m
+    pressure = 0 * u.bar
+    location = EarthLocation.from_geodetic(lon, lat, elevation)
+    coord = SkyCoord(ra='00h00m00s', dec='+90d00m00s')
+    time = Time('2000-01-01 12:00:00')
+    obs = Observer(location=location, pressure=pressure)
+    rise_time = obs.target_rise_time(time, coord, which='nearest')
+    w = recwarn.pop(TargetAlwaysUpWarning)
+    assert np.isnan(rise_time.jd)
+
 def test_solar_transit_convenience_methods():
     """
     Test that astroplan's noon and midnight convenience methods agree with
